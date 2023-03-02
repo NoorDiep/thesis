@@ -45,22 +45,36 @@ def get_data(lag):
     # Load all data
     df_swap, dates = read_file(file='SwapDriverData1.xlsx', sheet='Swap')
     df_drivers = read_file(file='SwapDriverData1.xlsx', sheet='Driver')
+    df_drivers = df_drivers.drop('Vol', axis=1)
     diff_swap = difference_series(df_swap, lag)
     df_drivers_diff = df_drivers.iloc[lag:]  # Cut off first n observations
 
     # Get descriptive statistics, corelation tables, adf test results and figures for Data Section
     # getDataTablesFigures()
 
-    # Create train and test set
+    # Create train, validation and test set
     df_drivers = df_drivers.reset_index(drop=True)
+    df_swap = df_swap.reset_index(drop=True)
+
     x_train, x_test, y_train, y_test = train_test_split(df_drivers, df_swap, test_size=0.2, shuffle=False)
+    x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.25, shuffle=False)
+
     x_train_diff, x_test_diff, y_train_diff, y_test_diff = train_test_split(df_drivers_diff, diff_swap, test_size=0.2, shuffle=False)
+    x_train_diff, x_val_diff, y_train_diff, y_val_diff = train_test_split(x_train_diff, y_train_diff, test_size=0.25, shuffle=False)
+
+    #x_train, x_test, y_train, y_test = train_test_split(df_drivers, df_swap, test_size=0.2, shuffle=False)
+    #x_train_diff, x_test_diff, y_train_diff, y_test_diff = train_test_split(df_drivers_diff, diff_swap, test_size=0.2, shuffle=False)
 
     data_full = [df_swap, df_drivers, diff_swap, df_drivers_diff]
-    data = [x_train, x_test, y_train, y_test]
-    data_diff = [x_train_diff, x_test_diff, y_train_diff, y_test_diff]
+    data = [x_train, x_val, x_test, y_train, y_val, y_test]
+    data_diff = [x_train_diff, x_val_diff, x_test_diff, y_train_diff, y_val_diff, y_test_diff]
+    date_train = dates[:x_train.shape[0]]
+    date_val = dates[x_train.shape[0]:x_val.index[-1]+1]
+    date_test = dates[x_val.index[-1]+2:]
+    date_train_diff = dates[lag:y_train_diff.shape[0]]
+    date_test_diff = dates[y_train_diff.shape[0]:len(dates)-lag]
 
-    return data_full, data, data_diff
+    return data_full, data, data_diff, date_train, date_test, date_train_diff, date_test_diff
 
 def getDataTablesFigures(df_swap, df_drivers, diff_swap):
     # Get descriptive statistics and corrlation matrix
@@ -134,8 +148,8 @@ def get_ds(df: pd.DataFrame):
     des_stats_table.index = ['mean', 'sd', 'min', '25%', 'median', '75%', 'max', 'skewness',
                              'kurtosis', 'AC(1)', 'AC(5)', 'AC(10)', 'PAC(1)', 'PAC(5)', 'PAC(10)']
     des_stats_table = des_stats_table.round(3)
-    latex = des_stats_table.to_latex()
-    return des_stats_table, latex
+    #latex = des_stats_table.to_latex()
+    return des_stats_table
 
 
 def pacf_plot(df: pd.DataFrame, maxlags: int):
@@ -255,12 +269,16 @@ def getadf_values(df: list, indicator_diff):
     return results
 
 
-def optimal_lag(x_train, y_train, maxlags, indicator):
-    # Strip indices of dataframes
-    x_train1 = x_train.reset_index(drop=True)
-    y_train1 = y_train.reset_index(drop=True)
-    dep = y_train1.T.reset_index(drop=True).T
+def optimal_lag(x_train, x_tv, y_train, y_tv, maxlags, indicator):
+    # # Strip indices of dataframes
+    # x_train1 = x_train.reset_index(drop=True)
+    # x_tv1 = x_tv.reset_index(drop=True)
+    # y_train1 = y_train.reset_index(drop=True)
+    # y_tv1 = y_tv.reset_index(drop=True)
+    # dep = y_train1.T.reset_index(drop=True).T
+    # dep_tv = y_tv1.T.reset_index(drop=True).T
     #dep = y_train1.iloc[:, 6]
+    dep = y_train
     dep.name = 0
 
     AIC = []
@@ -282,14 +300,14 @@ def optimal_lag(x_train, y_train, maxlags, indicator):
         # print('BIC : ', result.bic)
         # print('FPE : ', result.fpe)
         # print('HQIC: ', result.hqic, '\n')
-        AIC.append(result.aic)
-    idx = AIC.index(min(AIC))
+        AIC.append(result.bic)
+    idx = AIC.index(min(AIC)) + 1
     print('Optimal index is', idx)
     if indicator == 1:
-        return idx, AutoReg(endog=dep, exog=x_train1, lags=idx).fit()
+        return idx, AutoReg(endog=y_tv, exog=x_tv, lags=idx).fit()
     else:
         #return idx, AutoReg(endog=dep, lags=idx).fit()
-        return idx, ARIMA(dep, order=(idx, 0, 0)).fit()
+        return idx, ARIMA(y_tv, order=(idx, 0, 0)).fit()
 
 
 def predict_ar(train_df, test_df, exog_train, exog_test, no_lags, indicator):
@@ -326,7 +344,6 @@ def plot_forecast(pred, test):
     plt.plot(pred, label="forecast")
     plt.plot(test, color='red', label="actual")
     plt.legend(loc="upper left")
-    print("Test")
     plt.show()
 
 
@@ -337,6 +354,7 @@ def forecast_accuracy(forecast, actual, df_indicator):
         me = []
         mae = []
         mpe = []
+        mse = []
         rmse = []
         corr = []
 
@@ -345,14 +363,16 @@ def forecast_accuracy(forecast, actual, df_indicator):
             me.append(np.mean(forecast[column] - actual[column]))  # ME
             mae.append(np.mean(np.abs(forecast[column] - actual[column])))  # MAE
             mpe.append(np.mean((forecast[column] - actual[column]) / actual[column]))  # MPE
+            mse.append(np.mean((forecast[column] - actual[column]) ** 2) )  # MSE
             rmse.append(np.mean((forecast[column] - actual[column]) ** 2) ** .5)  # RMSE
             corr.append(np.corrcoef(forecast[column], actual[column])[0, 1])  # corr
-        print('mape: ', mape)
-        print('me:', me)
+        #print('mape: ', mape)
+        #print('me:', me)
         print('mae:', mae)
-        print('mpe:', mpe)
+        #print('mpe:', mpe)
+        print('mse:', mse)
         print('rmse:', rmse)
-        print('corr:', corr)
+        #print('corr:', corr)
         return
 
     else:
@@ -360,11 +380,11 @@ def forecast_accuracy(forecast, actual, df_indicator):
         me = np.mean(forecast - actual)             # ME
         mae = np.mean(np.abs(forecast - actual))    # MAE
         mpe = np.mean((forecast - actual)/actual)   # MPE
+        mse = np.mean((forecast - actual) ** 2)     # MSE
         rmse = np.mean((forecast - actual)**2)**.5  # RMSE
         corr = np.corrcoef(forecast, actual)[0,1]   # corr
-        print({'mape': mape, 'me': me, 'mae': mae,
-               'mpe': mpe, 'rmse': rmse, 'corr': corr})
-        return pd.DataFrame([[mape, me, mae, mpe, rmse, corr]], columns=['mape', 'me', 'mae', 'mpe', 'rmse', 'corr'])
+        #print({'mape': mape, 'me': me, 'mae': mae, 'mpe': mpe, 'rmse': rmse, 'corr': corr})
+        return pd.DataFrame([[mae, mse, rmse]], columns=['mae','mse', 'rmse'])
 
 def plot_components(x, data):
 
@@ -432,14 +452,17 @@ def buildAE(y_train, y_test):
     # )
     autoencoder.summary()
 
-    autoencoder.fit(y_train, y_train, epochs=10, batch_size=32, shuffle=False, validation_data=(y_test, y_test))
+    autoencoder.fit(y_train, y_train, epochs=20, batch_size=32, shuffle=False, validation_data=(y_test, y_test))
 
     encoder = Model(inputs=input_dim, outputs=encoded13)
     encoded_input = Input(shape=(encoding_dim,))
     encoded_train = pd.DataFrame(encoder.predict(y_train))
     encoded_train = encoded_train.add_prefix('feature_')
 
-    return encoded_train
+    encoded_test = pd.DataFrame(encoder.predict(y_test))
+    encoded_test = encoded_test.add_prefix('feature_')
+
+    return encoded_train, encoded_test
 
 
 

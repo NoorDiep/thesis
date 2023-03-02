@@ -1,6 +1,7 @@
 from statsmodels.tsa.vector_ar.var_model import VAR
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+import numpy as np
 
 from Drivers import get_data, getDataTablesFigures, optimal_lag, plot_forecast, forecast_accuracy, plot_components, buildAE
 
@@ -13,15 +14,26 @@ from keras import Sequential
 
 data, df, df_diff, date_train, date_test, date_train_diff, date_test_diff = get_data(lag=5)
 
-X_train = df[0]
-X_test = df[1]
-Y_train = df[2]
-Y_test = df[3]
 
-X_train_diff = df_diff[0]
-X_test_diff = df_diff[1]
-Y_train_diff = df_diff[2]
-Y_test_diff = df_diff[3]
+X_train = df[0]
+X_val = df[1]
+X_test = df[2]
+Y_train = df[3]
+Y_val = df[4]
+Y_test = df[5]
+
+
+X_train_diff  = df_diff [0]
+X_val_diff  = df_diff [1]
+X_test_diff  = df_diff [2]
+Y_train_diff  = df_diff [3]
+Y_val_diff  = df_diff [4]
+Y_test_diff  = df_diff [5]
+
+# combine the training and validation sets
+Y_tv = np.vstack((Y_train, Y_val))
+Y_tv_diff = np.vstack((Y_train_diff, Y_val_diff))
+
 
 #getDataTablesFigures(data[0], data[1], data[2]) # input: df_swap, df_drivers, swap_diff
 
@@ -33,26 +45,34 @@ Y_test_diff = df_diff[3]
 """
 Univariate autoregressive model
 """
-def getAR(x_train, y_train, y_test, plot_pred, dates):
+
+
+def getAR(x_train, y_train, y_tv, y_test, plot_pred, dates):
+    # Strip indices of dataframes
+    y_train1 = y_train.reset_index(drop=True)
+    dep = y_train1.T.reset_index(drop=True).T
+
+
 
     results = []
-    for column in y_train:
-        print(column)
+    for i in range(len(y_train)):
+        print(i)
         # Compute the optimal model; 1 indicating ARX model, AR model otherwise
-        idx_UAR, AR = optimal_lag(x_train, y_train[column], 30, 0)
+        idx_UAR, AR = optimal_lag(x_train=0, x_tv=0, y_train= dep[i],y_tv= y_tv[i], maxlags=10, indicator=0)
         AR.summary()
 
         # Forecast out-of-sample
         preds_AR = AR.predict(start=len(y_train), end=len(y_train) + len(y_test) - 1)
+        preds_AR = pd.DataFrame(preds_AR)
         preds_AR.index = dates
         y_test = y_test.set_index(dates)
 
         # Plot the prediction vs test data
         if plot_pred:
-            plot_forecast(preds_AR, y_test[column])
+            plot_forecast(preds_AR, y_test[i])
 
         # Get forecast accuracy
-        acc_AR = forecast_accuracy(preds_AR, y_test[column], df_indicator=0)
+        acc_AR = forecast_accuracy(preds_AR, y_test[i], df_indicator=0)
 
         results.append([idx_UAR, acc_AR])
         print(acc_AR)
@@ -221,7 +241,8 @@ def getAE(x_train, x_test, y_train, y_test, plot_pred, dates, forecast_method):
 ########################################################################################################################
 
 ###### Results with levels ######
-#resultsAR = getAR(X_train, Y_train, Y_test, plot_pred=0, dates=date_test)
+resultsAR = getAR(X_train, Y_train, Y_tv, Y_test, plot_pred=0, dates=date_test)
+resultsAR_diff = getAR(X_train_diff, Y_train_diff, Y_tv_diff, Y_test_diff, plot_pred=0, dates=date_test_diff)
 #resultsARX = getARX(X_train, X_test, Y_train, Y_test, plot_pred=1, dates=date_test)
 # getVAR(X_train, X_test, Y_train, Y_test, plot_pred=0, column='30Y', dates=date_test)
 # getVARX(X_train, X_test, Y_train, Y_test, plot_pred=0, column='30Y', dates=date_test)
