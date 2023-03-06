@@ -13,6 +13,7 @@ import statsmodels.tsa.stattools as ts
 from statsmodels.graphics.tsaplots import plot_pacf
 from statsmodels.tsa.ar_model import AutoReg
 from statsmodels.tsa.arima.model import ARIMA
+import statsmodels.api as sm
 from mpl_toolkits.mplot3d import Axes3D
 
 import keras
@@ -70,7 +71,7 @@ def get_data(lag):
     data_diff = [x_train_diff, x_val_diff, x_test_diff, y_train_diff, y_val_diff, y_test_diff]
     date_train = dates[:x_train.shape[0]]
     date_val = dates[x_train.shape[0]:x_val.index[-1]+1]
-    date_test = dates[x_val.index[-1]+2:]
+    date_test = dates[x_val.index[-1]+1:]
     date_train_diff = dates[lag:y_train_diff.shape[0]]
     date_test_diff = dates[y_train_diff.shape[0]:len(dates)-lag]
 
@@ -269,45 +270,61 @@ def getadf_values(df: list, indicator_diff):
     return results
 
 
-def optimal_lag(x_train, x_tv, y_train, y_tv, maxlags, indicator):
-    # # Strip indices of dataframes
-    # x_train1 = x_train.reset_index(drop=True)
-    # x_tv1 = x_tv.reset_index(drop=True)
-    # y_train1 = y_train.reset_index(drop=True)
-    # y_tv1 = y_tv.reset_index(drop=True)
-    # dep = y_train1.T.reset_index(drop=True).T
-    # dep_tv = y_tv1.T.reset_index(drop=True).T
-    #dep = y_train1.iloc[:, 6]
-    dep = y_train
-    dep.name = 0
+def optimal_lag(x_train, x_tv, y_train, y_tv, maxlags_p, maxlags_q, indicator):
 
-    AIC = []
+    BIC = []
+    idx_q =[]
+    q_opt = 0
 
-    for i in range(1,maxlags,1):
+    for i in range(1,maxlags_p+1,1):
+        print(i)
         # Construct the model for different lags
         if indicator == 1:
-            # ARX model
-            #model = AutoReg(endog=dep, exog=x_train1, lags=i)
-            model = AutoReg(endog=dep, exog=x_train1, lags=i)
+            BIC_inter = []
+            for j in range(1, maxlags_q+1,1):
+                print(j)
+                # Create lagged exogenous variables
+                x_train_lagged = pd.DataFrame(x_train).shift(j).dropna()
+                x_tv_lagged = pd.DataFrame(x_tv).shift(j).dropna()
+                # ARX model
+                #model = AutoReg(endog=dep, exog=x_train1, lags=i)
+                model = ARIMA(endog=y_train[:y_train.size-j], exog=x_train_lagged, order=(i,0,0))
+                #model = sm.tsa.ARMAX(y_train, x_train, order=(i, j))
+
+                try:
+                    result = model.fit()
+                except:
+                    print('Error at lag ', i)
+                    pass
+
+                BIC_inter.append(result.bic)
+            idx_q.append(BIC_inter.index(min(BIC_inter)) + 1)
+            BIC.append(BIC_inter)
         else:
             # AR model
             #model = AutoReg(endog=dep, lags=i)
-            model = ARIMA(dep, order=(i,0,0))
+            model = ARIMA(y_train, order=(i, 0, 0))
 
-        result = model.fit()
-        # print('Lag Order =', i)
-        # print('AIC : ', result.aic)
-        # print('BIC : ', result.bic)
-        # print('FPE : ', result.fpe)
-        # print('HQIC: ', result.hqic, '\n')
-        AIC.append(result.bic)
-    idx = AIC.index(min(AIC)) + 1
-    print('Optimal index is', idx)
+            try:
+                result = model.fit()
+            except:
+                print('Error at lag ', i)
+                pass
+
+            BIC.append(result.bic)
+    p_opt = BIC.index(min(BIC)) + 1
+
+    try:
+        q_opt = idx_q[p_opt-1]
+    except:
+        pass
+
+    print('Optimal index is', p_opt)
     if indicator == 1:
-        return idx, AutoReg(endog=y_tv, exog=x_tv, lags=idx).fit()
+        return p_opt, q_opt #, AutoReg(endog=y_tv, exog=x_tv_lagged.iloc[maxlags_q-1:], lags=idx).fit()
     else:
         #return idx, AutoReg(endog=dep, lags=idx).fit()
-        return idx, ARIMA(y_tv, order=(idx, 0, 0)).fit()
+        return p_opt #, ARIMA(y_tv, order=(idx, 0, 0)).fit()
 
 
 def predict_ar(train_df, test_df, exog_train, exog_test, no_lags, indicator):
@@ -326,9 +343,9 @@ def predict_ar(train_df, test_df, exog_train, exog_test, no_lags, indicator):
     t_test = test_df.index
 
     if indicator == 1:
-        pred = AR_model.predict(exog_oos=exog_test,start=len(train_df), end=len(train_df) + len(test_df) - 1, dynamic=True)
+        pred = AR_model.predict(exog_oos=exog_test,start=len(train_df), end=len(train_df) + len(test_df) - 1, dynamic=False)
     else:
-        pred = AR_model.predict(start=len(train_df), end=len(train_df) + len(test_df) - 1, dynamic=True)
+        pred = AR_model.predict(start=len(train_df), end=len(train_df) + len(test_df) - 1, dynamic=False)
 
     #pred = AR_model.predict(start=len(train_df), end=len(train_df) + len(test_df) - 1, dynamic=True)
     pred.index = t_test
