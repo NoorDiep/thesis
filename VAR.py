@@ -3,7 +3,7 @@ from sklearn.decomposition import PCA
 import numpy as np
 from statsmodels.tsa.arima.model import ARIMA
 
-from Drivers import get_data, optimal_lag, plot_forecast, forecast_accuracy, buildAE
+from Drivers import get_data, getDataTablesFigures, optimal_lag, plot_forecast, forecast_accuracy, buildAE
 
 import pandas as pd
 
@@ -30,12 +30,13 @@ Y_test_diff  = df_diff [5]
 # Combine the training and validation sets
 Y_tv = np.vstack((Y_train, Y_val))
 Y_tv_diff = np.vstack((Y_train_diff, Y_val_diff))
+Y_diff = np.vstack((Y_tv_diff,Y_test_diff))
 
 X_tv = np.vstack((X_train, X_val))
 X_tv_diff = np.vstack((X_train_diff, X_val_diff))
 
 # Return tables and figures for Data section
-#getDataTablesFigures(data[0], data[1], data[2]) # input: df_swap, df_drivers, swap_diff
+#getDataTablesFigures(data[0], data[1], pd.DataFrame(Y_diff)) # input: df_swap, df_drivers, swap_diff
 
 ########################################################################################################################
 # FORECASTING METHODS
@@ -169,7 +170,7 @@ def getARX(x_train, x_tv, x_test, y_train, y_tv, y_test, h, plot_pred, dates):
                 plot_forecast(preds_ARX, test)
 
             # Get forecast accuracy
-            acc_AR = forecast_accuracy(preds_ARX, test, df_indicator=0)
+            acc_AR = forecast_accuracy(np.array(preds_ARX), np.array(test), df_indicator=0)
             f_i.append(acc_AR)
             results.append(preds_ARX)
         f_i = pd.DataFrame(np.concatenate(f_i), columns=['MEA', 'MSE', 'RMSE'])
@@ -240,13 +241,162 @@ def getVARX(x_train, x_test, y_train, y_test, plot_pred, column, dates):
     forecast_accuracy(df_forecast,y_test,df_indicator=1)
 
 """
+Principal component analysis AR
+"""
+def getARPCA(means, PCs, y_train, y_tv, y_test, y_s, h, plot_pred, dates):
+
+    # Stack all data sets to one series
+    y = np.vstack((pd.DataFrame(y_tv), pd.DataFrame(y_test)))
+
+    # Define variables
+    n_train = y_train.shape[0]
+    n_tv = y_tv.shape[0]
+    n = y_test.shape[0]
+    w = y_tv.shape[0]
+    f_measures = []
+    results = []
+    idx_p =[]
+    mean = []
+
+    # Get the number of columns
+    try:
+        cols = y_train.shape[1]
+    except:
+        #
+        cols = 1
+
+    # Loop over each column
+    for i in range(cols):
+        print(i)
+        f_mae = []
+        f_mse = []
+        f_rmse = []
+        f_i = []
+        # Compute the optimal model; 1 indicating ARX model, AR model otherwise
+        idx = optimal_lag(x_train=0, x_tv=0, y_train=y[:n_train,i], y_tv=y[:n_tv,i], maxlags_p=10, maxlags_q=10, indicator=0)
+
+        # Perform rolling window forecasts
+        for k in range(n - h + 1):
+            print(k)
+            f_k =[]
+            for i in range(cols):
+                train = y[k:w+k, i]
+
+                AR = ARIMA(train, order=(idx, 0, 0)).fit()
+
+                # Forecast out-of-sample
+                preds_PC = AR.predict(start=len(y_tv)+k, end=len(y_tv)+k + h - 1, dynamic=False) # Dynamic equal to False means direct forecasts
+                f_k.append(preds_PC)
+            preds_AR = pd.DataFrame(f_k)
+            preds_AR_s = np.dot(preds_AR.T, PCs) + means[0]
+            preds_AR_s= pd.DataFrame(preds_AR_s)
+            preds_AR_s.index = dates.iloc[k:k+h]
+            test = y_s[len(y_tv)+k:len(y_tv)+k + h, ]
+            test = pd.DataFrame(test)
+            test.index = dates.iloc[k:k + h]
+
+            # Plot the prediction vs test data
+            if plot_pred:
+                plot_forecast(preds_AR_s, test)
+
+            # Get forecast accuracy
+            acc_AR = forecast_accuracy(preds_AR_s, test, df_indicator=0)
+            f_mae.append(np.mean(acc_AR.iloc[0]['mae']))
+            f_mse.append(np.mean(acc_AR.iloc[0]['mse']))
+            f_rmse.append(np.mean(acc_AR.iloc[0]['rmse']))
+            results.append(preds_AR_s)
+            fmsr = [np.mean(f_mae), np.mean(f_mse), np.mean(f_rmse)]
+            f_i.append(pd.DataFrame(fmsr).T)
+            t=1
+        f = pd.DataFrame(np.concatenate(f_i), columns=['MEA', 'MSE', 'RMSE'])
+        f_measures.append(f)
+        mean.append(np.mean(f))
+        idx_p.append(idx)
+
+    return f_measures, mean, results, idx_p
+"""
+Principal component analysis ARX
+"""
+def getARXPCA(means, PCs, y_train, y_tv, y_test, y_s, h, plot_pred, dates):
+
+    # Stack all data sets to one series
+    y = np.vstack((pd.DataFrame(y_tv), pd.DataFrame(y_test)))
+
+    # Define variables
+    n_train = y_train.shape[0]
+    n_tv = y_tv.shape[0]
+    n = y_test.shape[0]
+    w = y_tv.shape[0]
+    f_measures = []
+    results = []
+    idx_p =[]
+    mean = []
+
+    # Get the number of columns
+    try:
+        cols = y_train.shape[1]
+    except:
+        #
+        cols = 1
+
+    # Loop over each column
+    for i in range(cols):
+        print(i)
+        f_mae = []
+        f_mse = []
+        f_rmse = []
+        f_i = []
+        # Compute the optimal model; 1 indicating ARX model, AR model otherwise
+        idx = optimal_lag(x_train=0, x_tv=0, y_train=y[:n_train,i], y_tv=y[:n_tv,i], maxlags_p=10, maxlags_q=10, indicator=0)
+
+        # Perform rolling window forecasts
+        for k in range(n - h + 1):
+            print(k)
+            f_k =[]
+            for i in range(cols):
+                train = y[k:w+k, i]
+
+                AR = ARIMA(train, order=(idx, 0, 0)).fit()
+
+                # Forecast out-of-sample
+                preds_PC = AR.predict(start=len(y_tv)+k, end=len(y_tv)+k + h - 1, dynamic=False) # Dynamic equal to False means direct forecasts
+                f_k.append(preds_PC)
+            preds_AR = pd.DataFrame(f_k)
+            preds_AR_s = np.dot(preds_AR.T, PCs) + means[0]
+            preds_AR_s= pd.DataFrame(preds_AR_s)
+            preds_AR_s.index = dates.iloc[k:k+h]
+            test = y_s[len(y_tv)+k:len(y_tv)+k + h, ]
+            test = pd.DataFrame(test)
+            test.index = dates.iloc[k:k + h]
+
+            # Plot the prediction vs test data
+            if plot_pred:
+                plot_forecast(preds_AR_s, test)
+
+            # Get forecast accuracy
+            acc_AR = forecast_accuracy(preds_AR_s, test, df_indicator=0)
+            f_mae.append(np.mean(acc_AR.iloc[0]['mae']))
+            f_mse.append(np.mean(acc_AR.iloc[0]['mse']))
+            f_rmse.append(np.mean(acc_AR.iloc[0]['rmse']))
+            results.append(preds_AR_s)
+            fmsr = [np.mean(f_mae), np.mean(f_mse), np.mean(f_rmse)]
+            f_i.append(pd.DataFrame(fmsr).T)
+            t=1
+        f = pd.DataFrame(np.concatenate(f_i), columns=['MEA', 'MSE', 'RMSE'])
+        f_measures.append(f)
+        mean.append(np.mean(f))
+        idx_p.append(idx)
+
+    return f_measures, mean, results, idx_p
+
+"""
 Principal component analysis
 """
-def getPCA(y_train, y_test, method):
+def getPCA(x_train, y_train, y_tv, y_test, n_max, method):
     # https://www.geeksforgeeks.org/implementing-pca-in-python-with-scikit-learn/?ref=rp
-    centered = y_train - np.mean(y_train, axis=0)
+
     pca = PCA()
-    pca.fit(centered)
+    pca.fit(y_train)
 
     # Calculate the explained variance for each component
     variance = pca.explained_variance_ratio_
@@ -254,23 +404,50 @@ def getPCA(y_train, y_test, method):
     cumulative_variance = np.cumsum(variance)
     # Determine the number of components needed to explain a given amount of variance
     n = np.argmax(cumulative_variance >= 0.95) + 1
+    scree_df = []
+    f_total = []
+    p_total = []
+    q_total = []
+    means = []
+    y = np.vstack((pd.DataFrame(y_tv), pd.DataFrame(y_test)))
+    for n in range(1,n_max+1): #range(1,n_max+1):
+        print("Component: ", n)
+        pca = PCA(n_components=n)
 
-    pca = PCA(n_components=n)
+        PC_train = pca.fit_transform(y_tv)
+        y_trainPC = np.dot(PC_train, pca.components_) + np.array(np.mean(y_train, axis=0))
 
-    PC_train = pca.fit_transform(y_train)
-    PC_train_df = pd.DataFrame(PC_train)
-    PC_tv = pca.transform(y_test)
-    PC_tv_df = pd.DataFrame(PC_tv)
-    PC_test = pca.transform(y_test)
-    PC_test_df = pd.DataFrame(PC_test)
+        names_pcas = [f"PCA Component {i}" for i in range(1, n+1, 1)]
+        scree = pd.DataFrame(list(zip(names_pcas, pca.explained_variance_ratio_)), columns=["Component", "Explained Variance Ratio"])
+        scree_df.append(scree)
+        print(scree)
 
-    if method == "AR":
-        q=None
-        f, f_mean, results, p = getAR(X_train, PC_train, PC_tv, PC_test, h=10, plot_pred=0, dates=date_test)
-    else:
-        f, f_mean, results, p, q = getARX(X_train, X_tv, X_test, PC_train, PC_tv, PC_test, h=10, plot_pred=0, dates=date_test)
 
-    return n, f, f_mean, results, p, q
+        PC_tv = pca.transform(y_test)
+        y_tvPC = np.dot(PC_tv, pca.components_) + np.array(np.mean(y_tv, axis=0))
+        PC_tv_df = pd.DataFrame(PC_tv)
+        PC_test = pca.transform(y_test)
+        y_testPC = np.dot(PC_test, pca.components_) + np.array(np.mean(y_test, axis=0))
+        PC_test_df = pd.DataFrame(PC_test)
+
+
+        means.append(np.array(np.mean(y_train, axis=0)))
+        means.append(np.array(np.mean(y_tv, axis=0)))
+        means.append(np.array(np.mean(y_test, axis=0)))
+
+        if method == "AR":
+            f, f_mean, results, p = getARPCA(means,  pca.components_, PC_train, PC_tv, PC_test, y, h=10, plot_pred=0, dates=date_test)
+            f_total.append(f_mean)
+            p_total.append(p)
+            q_total = None
+            t=1
+        else:
+            f, f_mean, results, p, q = getARX(x_train, X_tv, X_test, PC_train, PC_tv, PC_test, h=10, plot_pred=0, dates=date_test)
+            f_total.append(f_mean)
+            p_total.append(p)
+            q_total.append(q)
+    t=1
+    return f_total, p_total, q_total
 
 """
 Autoencoder factor analysis
@@ -309,18 +486,23 @@ def getAE(x_train, x_test, y_train, y_test, plot_pred, dates, forecast_method):
 ########################################################################################################################
 
 ###### Results with levels ######
-#f_AR, f_AR_mean, resultsAR, idx_p = getAR(X_train, Y_train['10Y'], Y_tv[:,6], Y_test['10Y'], h=10, plot_pred=0, dates=date_test)
-#print('AR', f_AR, f_AR_mean)
-#f_AR_d, f_AR_d_mean, resultsAR_d, idx_p_d = getAR(X_train_diff, Y_train_diff['10Y'], Y_tv_diff[:,6], Y_test_diff['10Y'], h=10, plot_pred=0, dates=date_test_diff)
-#print('AR_d', f_AR_d, f_AR_d_mean)
-f_ARX, f_ARX_mean, resultsARX, p, q = getARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, h=10, plot_pred=0, dates=date_test)
-print('ARX', f_ARX, f_ARX_mean)
-f_ARX_d, f_ARX_d_mean, resultsARX_d, p_d, q_d = getARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, h=10, plot_pred=0, dates=date_test)
-print('ARX_d', f_ARX_d, f_ARX_d_mean)
+f_ARh1, f_ARh1_mean, resultsARh1, idx_ph1 = getAR(X_train, Y_train, Y_tv, Y_test, h=1, plot_pred=0, dates=date_test)
+print('AR', f_ARh1, f_ARh1_mean)
+f_ARh1_d, f_ARh1_d_mean, resultsARh1_d, idx_ph1_d = getAR(X_train_diff, Y_train_diff, Y_tv_diff, Y_test_diff, h=1, plot_pred=0, dates=date_test_diff)
+print('AR_d', f_ARh1_d, f_ARh1_d_mean)
+f_ARh5, f_ARh5_mean, resultsARh5, idx_ph5 = getAR(X_train, Y_train, Y_tv, Y_test, h=5, plot_pred=0, dates=date_test)
+print('AR', f_ARh5, f_ARh5_mean)
+f_ARh5_d, f_ARh5_d_mean, resultsARh5_d, idx_ph5_d = getAR(X_train_diff, Y_train_diff, Y_tv_diff, Y_test_diff, h=5, plot_pred=0, dates=date_test_diff)
+print('AR_d', f_ARh5_d, f_ARh5_d_mean)
+# f_ARX, f_ARX_mean, resultsARX, p, q = getARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, h=10, plot_pred=0, dates=date_test)
+# print('ARX', f_ARX, f_ARX_mean)
+# f_ARX_d, f_ARX_d_mean, resultsARX_d, p_d, q_d = getARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, h=10, plot_pred=0, dates=date_test)
+# print('ARX_d', f_ARX_d, f_ARX_d_mean)
 # t=1
 # getVAR(X_train, X_test, Y_train, Y_test, plot_pred=0, column='30Y', dates=date_test)
 # getVARX(X_train, X_test, Y_train, Y_test, plot_pred=0, column='30Y', dates=date_test)
-n_PCA, f_PCA, f_PCA_mean, resultsPCA = getPCA( Y_train, Y_tv, Y_test, dates=date_test, forecast_method='AR')
+f_PCA_mean, optPPCA, optQPCA = getPCA(X_train, Y_train, Y_tv, Y_test, n_max=5,  method='AR')
+f_PCA_mean, optPPCA, optQPCA = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5,  method='AR')
 t=1
 #resultsPCA_ARX = getPCA(X_train, X_test, Y_train, Y_test, dates=date_test, forecast_method='ARX')
 #resultsAE_AR = getAE(X_train, X_test, Y_train, Y_test, plot_pred=0, dates=date_test, forecast_method='AR')

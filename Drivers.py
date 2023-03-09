@@ -81,6 +81,7 @@ def getDataTablesFigures(df_swap, df_drivers, diff_swap):
     # Get descriptive statistics and corrlation matrix
     ds_swap, ds_swap_latex = get_ds(df_swap)
     ds_drivers, ds_drivers_latex = get_ds(df_drivers)
+    ds_diff, ds_diff_latex = get_ds(diff_swap)
 
     corr_drivers = df_drivers.corr().round(3)
 
@@ -98,6 +99,7 @@ def getDataTablesFigures(df_swap, df_drivers, diff_swap):
     # Print all output for Data Section
     print('Descriptive statistics swap rate ', ds_swap)
     print('Descriptive statistics drivers ', ds_drivers)
+    print('Descriptive statistics drivers ', ds_diff)
     print('Correlation drivers ', corr_drivers.to_latex())
     print('VIF:', VIF)
     print('ADF test results swap in levels', adf)
@@ -398,8 +400,7 @@ def forecast_accuracy(forecast, actual, df_indicator):
         mae = np.mean(np.abs(forecast - actual))    # MAE
         mpe = np.mean((forecast - actual)/actual)   # MPE
         mse = np.mean((forecast - actual) ** 2)     # MSE
-        rmse = np.mean((forecast - actual)**2)**.5  # RMSE
-        corr = np.corrcoef(forecast, actual)[0,1]   # corr
+        rmse = np.mean((forecast - actual)**2)**.5# RMSE
         #print({'mape': mape, 'me': me, 'mae': mae, 'mpe': mpe, 'rmse': rmse, 'corr': corr})
         return pd.DataFrame([[mae, mse, rmse]], columns=['mae','mse', 'rmse'])
 

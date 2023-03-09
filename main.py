@@ -1,182 +1,73 @@
+from VAR import getAR, getARX, getPCA, getAE
+from Drivers import get_data
+
 import numpy as np
-import pandas as pd
-from VAR import get_data
 
-def fit_ar_model(train, test, max_p):
-    num_cols = test.shape[1]
-    preds = None
-    train_means = []
-    train_stds = []
-    best_p = None
-    best_bic = np.inf
-
-    # Initialize variables to keep track of best model
-    best_model_mae = np.inf
-    best_model_mse = np.inf
-    best_model_rmse = np.inf
-
-    for column in range(num_cols):
-        train_data = train[column]
-        test_data = test[column]
-
-        # Calculate mean and standard deviation of training data
-        train_mean = np.mean(train_data)
-        train_std = np.std(train_data)
-        train_means.append(train_mean)
-        train_stds.append(train_std)
-
-        for p in range(1,max_p+1):
-            # Construct design matrix X and response vector y for OLS regression
-            X = np.zeros((len(train_data) - p, p))
-            y = np.zeros(len(train_data) - p)
-            for j in range(p):
-                X[:, j] = train_data[p - j - 1:-j - 1]
-            y = train_data[p:]
-
-            # Estimate model parameters using OLS regression
-            beta = np.linalg.inv(X.T.dot(X)).dot(X.T).dot(y)
-
-            # Make predictions on test set
-            pred = []
-            for j in range(len(test_data)):
-                if j < p:
-                    pred.append(train_data.iloc[-(p - j)])
-                else:
-                    y = np.dot(beta, np.flip(train_data[j - p:j]))
-                    pred.append(y)
-
-            # Calculate BIC for current p
-            residuals = np.array(train_data[p:]) - np.dot(X, beta)
-            n = len(train_data)
-            k = p + 1
-            loglik = -0.5 * n * (np.log(2 * np.pi) + np.log(np.mean(residuals ** 2)) + 1)
-            bic = -2 * loglik + k * np.log(n)
-
-            # Calculate performance metrics
-            mae = np.mean(np.abs(np.array(pred) - test_data))
-            mse = np.mean((np.array(pred) - test_data) ** 2)
-            rmse = np.sqrt(mse)
-
-            # Update best model if BIC is lower
-            if bic < best_bic:
-                best_bic = bic
-                best_p = p
-                preds = pred
-                best_model_mae = mae
-                best_model_mse = mse
-                best_model_rmse = rmse
-
-    return preds, best_model_mae, best_model_mse, best_model_rmse, best_p
-
-
-def fit_arx_model(y_train, y_test, max_p, max_q, train_X, test_X):
-
-    preds = []
-    train_means = []
-    train_stds = []
-    best_bic = np.inf
-    best_params = (0, 0)
-    for column in y_train:
-        col_train_data = y_train[column]
-        col_test_data = y_test[column]
-        col_train_X = train_X
-        col_test_X = test_X
-
-        # Calculate mean and standard deviation of training data
-        train_mean = np.mean(col_train_data)
-        train_std = np.std(col_train_data)
-        train_means.append(train_mean)
-        train_stds.append(train_std)
-
-        # Initialize variables to keep track of best model
-        best_model_pred = None
-        best_model_mae = np.inf
-        best_model_mse = np.inf
-        best_model_rmse = np.inf
-
-        # Fit models for different values of p and q
-        for p in range(1, max_p + 1):
-            for q in range(0, max_q + 1):
-                # Construct design matrix X and response vector y for OLS regression
-                n = len(col_train_data) - max(p, q)
-                X_train = np.zeros((n, p + q * col_train_X.shape[1]))
-                y_train = np.zeros(n)
-                for j in range(p):
-                    X_train[:, j] = col_train_data[p - j - 1:-j - 1]
-                for j in range(q):
-                    X_train[:, p + j * col_train_X.shape[1]:p + (j + 1) * col_train_X.shape[1]] = col_train_X[
-                                                                                                  q - j - 1:-j - 1, :]
-                y_train = col_train_data[max(p, q):]
-
-                # Estimate model parameters using OLS regression
-                beta = np.linalg.inv(X_train.T.dot(X_train)).dot(X_train.T).dot(y_train)
-
-                # Make predictions on test set
-                pred = []
-                for j in range(len(col_test_data)):
-                    if j < max(p, q):
-                        if q > j:
-                            pred.append(col_train_data.iloc[-(q - j)])
-                        else:
-                            if p == 1 and j == 0:
-                                pred.append(beta[0])
-                            else:
-                                pred.append(np.dot(beta[:p], np.flip(col_train_data[-p - j:-j])))
-                    else:
-                        x = np.concatenate(
-                            (np.flip(col_test_data[j - p:j]), np.flip(col_test_X[-q + j:].values.flatten()), np.array([1])))
-                        y = np.dot(beta, x)
-                        pred.append(y)
-
-                # Calculate performance metrics and BIC
-                mae = np.mean(np.abs(np.array(pred) - col_test_data))
-                mse = np.mean((np.array(pred) - col_test_data) ** 2)
-                rmse = np.sqrt(mse)
-                k = p + q * col_train_X.shape[1] + 1
-                n = len(col_train_data) - max(p, q)
-                log_likelihood = -0.5 * (n * np.log(2 * np.pi * mse) + n)
-                bic = np.log(n) * k - 2 * log_likelihood
-
-                # Update best model if BIC is lower
-                if bic < best_bic:
-                    best_bic = bic
-                    best_params = (p, q)
-                    best_model_pred = pred
-                    best_model_mae = mae
-                    best_model_mse = mse
-                    best_model_rmse = rmse
-                    preds.append(best_model_pred)
-
-    return preds, best_model_pred, best_params, best_bic, best_model_mae, best_model_mse, best_model_rmse
-
-# Example usage
+########################################################################################################################
+# LOAD DATA
+########################################################################################################################
+# Import data into 60% training, 20% validation and 20% test sets
 data, df, df_diff, date_train, date_test, date_train_diff, date_test_diff = get_data(lag=5)
 
+
 X_train = df[0]
-X_test = df[1]
-Y_train = df[2]
-Y_test = df[3]
+X_val = df[1]
+X_test = df[2]
+Y_train = df[3]
+Y_val = df[4]
+Y_test = df[5]
 
-X_train_diff = df_diff[0]
-X_test_diff = df_diff[1]
-Y_train_diff = df_diff[2]
-Y_test_diff = df_diff[3]
 
-############ ARX ############
-#fit_arx_model(Y_train, Y_test, 10, 10, X_train, X_test)
+X_train_diff  = df_diff [0]
+X_val_diff  = df_diff [1]
+X_test_diff  = df_diff [2]
+Y_train_diff  = df_diff [3]
+Y_val_diff  = df_diff [4]
+Y_test_diff  = df_diff [5]
 
-############ AR ############
-preds, mae, mse, rmse, best_p = fit_ar_model(Y_train['10Y'], Y_test['10Y'], 10)
-print("Predictions:\n", preds)
-print("MAE:", mae)
-print("MSE:", mse)
-print("RMSE:", rmse)
+# Combine the training and validation sets
+Y_tv = np.vstack((Y_train, Y_val))
+Y_tv_diff = np.vstack((Y_train_diff, Y_val_diff))
+Y_diff = np.vstack((Y_tv_diff,Y_test_diff))
 
+X_tv = np.vstack((X_train, X_val))
+X_tv_diff = np.vstack((X_train_diff, X_val_diff))
+
+# Return tables and figures for Data section
+#getDataTablesFigures(data[0], data[1], pd.DataFrame(Y_diff)) # input: df_swap, df_drivers, swap_diff
+
+
+########################################################################################################################
+# RUN CODE
+########################################################################################################################
+
+###### Results with levels ######
+f_ARh1, f_ARh1_mean, resultsARh1, idx_ph1 = getAR(X_train, Y_train, Y_tv, Y_test, h=1, plot_pred=0, dates=date_test)
+print('AR', f_ARh1, f_ARh1_mean)
+f_ARh1_d, f_ARh1_d_mean, resultsARh1_d, idx_ph1_d = getAR(X_train_diff, Y_train_diff, Y_tv_diff, Y_test_diff, h=1, plot_pred=0, dates=date_test_diff)
+print('AR_d', f_ARh1_d, f_ARh1_d_mean)
+f_ARh5, f_ARh5_mean, resultsARh5, idx_ph5 = getAR(X_train, Y_train, Y_tv, Y_test, h=1, plot_pred=0, dates=date_test)
+print('AR', f_ARh5, f_ARh5_mean)
+f_ARh5_d, f_ARh5_d_mean, resultsARh5_d, idx_ph5_d = getAR(X_train_diff, Y_train_diff, Y_tv_diff, Y_test_diff, h=1, plot_pred=0, dates=date_test_diff)
+print('AR_d', f_ARh5_d, f_ARh5_d_mean)
+# f_ARX, f_ARX_mean, resultsARX, p, q = getARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, h=10, plot_pred=0, dates=date_test)
+# print('ARX', f_ARX, f_ARX_mean)
+# f_ARX_d, f_ARX_d_mean, resultsARX_d, p_d, q_d = getARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, h=10, plot_pred=0, dates=date_test)
+# print('ARX_d', f_ARX_d, f_ARX_d_mean)
+# t=1
+# getVAR(X_train, X_test, Y_train, Y_test, plot_pred=0, column='30Y', dates=date_test)
+# getVARX(X_train, X_test, Y_train, Y_test, plot_pred=0, column='30Y', dates=date_test)
+f_PCA_mean, optPPCA, optQPCA = getPCA(X_train, Y_train, Y_tv, Y_test, n_max=5,  method='AR')
+f_PCA_mean, optPPCA, optQPCA = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5,  method='AR')
 t=1
+#resultsPCA_ARX = getPCA(X_train, X_test, Y_train, Y_test, dates=date_test, forecast_method='ARX')
+#resultsAE_AR = getAE(X_train, X_test, Y_train, Y_test, plot_pred=0, dates=date_test, forecast_method='AR')
+#resultsAE_ARX = getAE(X_train, X_test, Y_train, Y_test, plot_pred=0, dates=date_test, forecast_method='ARX')
 
-preds, train_means, train_stds, mae, mse, rmse = fit_ar_model(Y_train_diff, Y_test_diff, 3)
-print("Differenced AR process results")
-print("Predictions:\n", preds)
-print("MAE:", mae)
-print("MSE:", mse)
-print("RMSE:", rmse)
+
+###### Results with differences ######
+#resultsAR_diff = getAR(X_train_diff, Y_train_diff, Y_test_diff, plot_pred=0, dates=date_test_diff)
+#resultsARX_diff = getARX(X_train_diff, X_test_diff, Y_train_diff, Y_test_diff, plot_pred=0, dates=date_test_diff)
+#resultsVAR_diff = getVAR(X_train_diff, X_test_diff, Y_train_diff, Y_test_diff, plot_pred=0, column='30Y', dates=date_test_diff)
+#resultsVARX_diff = getVARX(X_train_diff, X_test_diff, Y_train_diff, Y_test_diff, plot_pred=0, column='30Y', dates=date_test_diff)
+t=1
