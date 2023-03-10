@@ -420,7 +420,7 @@ def plot_components(x, data):
     axis.add_artist(legend1)
     plt.show()
 
-def buildAE(y_train, y_test):
+def buildAE(y_train, y_tv, y_test):
     # https://www.kaggle.com/code/saivarunk/dimensionality-reduction-using-keras-auto-encoder
 
     ncol = y_train.shape[1]
@@ -445,7 +445,7 @@ def buildAE(y_train, y_test):
     grid_search = GridSearchCV(autoencoder, param_grid, scoring='neg_mean_squared_error', cv=5)
 
     # Fit grid search object to training data
-    grid_search.fit(y_train, y_train, shuffle=False)
+    grid_search.fit(y_tv, y_train, shuffle=False)
 
     # Print best parameters
     print("Best parameters: ", grid_search.best_params_)
@@ -458,10 +458,14 @@ def buildAE(y_train, y_test):
     encoded_train = pd.DataFrame(encoder.predict(y_train))
     encoded_train = encoded_train.add_prefix('feature_')
 
+    encoded_tv = pd.DataFrame(encoder.predict(y_tv))
+
     encoded_test = pd.DataFrame(encoder.predict(y_test))
     encoded_test = encoded_test.add_prefix('feature_')
 
-    return encoded_train, encoded_test
+    decoder = Model(inputs=autoencoder.input, outputs=autoencoder.get_layer('decoded').output)
+
+    return encoded_train, encoded_tv, encoded_test, decoder
 
 
 
