@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 
 from statsmodels.tools import add_constant
 from statsmodels.stats.outliers_influence import variance_inflation_factor
@@ -429,50 +429,31 @@ def buildAE(y_train, y_test):
     input_dim = Input(shape=(ncol,))
 
     # Encoder Layers
-    encoded1 = Dense(3000, activation='relu')(input_dim)
-    encoded2 = Dense(2750, activation='relu')(encoded1)
-    encoded3 = Dense(2500, activation='relu')(encoded2)
-    encoded4 = Dense(2250, activation='relu')(encoded3)
-    encoded5 = Dense(2000, activation='relu')(encoded4)
-    encoded6 = Dense(1750, activation='relu')(encoded5)
-    encoded7 = Dense(1500, activation='relu')(encoded6)
-    encoded8 = Dense(1250, activation='relu')(encoded7)
-    encoded9 = Dense(1000, activation='relu')(encoded8)
-    encoded10 = Dense(750, activation='relu')(encoded9)
-    encoded11 = Dense(500, activation='relu')(encoded10)
-    encoded12 = Dense(250, activation='relu')(encoded11)
-    encoded13 = Dense(encoding_dim, activation='relu')(encoded12)
+    encoded = Dense(3, activation='tanh')(input_dim)
 
     # Decoder Layers
-    decoded1 = Dense(250, activation='relu')(encoded13)
-    decoded2 = Dense(500, activation='relu')(decoded1)
-    decoded3 = Dense(750, activation='relu')(decoded2)
-    decoded4 = Dense(1000, activation='relu')(decoded3)
-    decoded5 = Dense(1250, activation='relu')(decoded4)
-    decoded6 = Dense(1500, activation='relu')(decoded5)
-    decoded7 = Dense(1750, activation='relu')(decoded6)
-    decoded8 = Dense(2000, activation='relu')(decoded7)
-    decoded9 = Dense(2250, activation='relu')(decoded8)
-    decoded10 = Dense(2500, activation='relu')(decoded9)
-    decoded11 = Dense(2750, activation='relu')(decoded10)
-    decoded12 = Dense(3000, activation='relu')(decoded11)
-    decoded13 = Dense(ncol, activation='sigmoid')(decoded12)
+    decoded = Dense(ncol, activation='tanh')(encoded)
 
     # Combine Encoder and Deocder layers
-    autoencoder = Model(inputs=input_dim, outputs=decoded13)
+    autoencoder = Model(inputs=input_dim, outputs=decoded)
 
-    # Compile the Model
-    autoencoder.compile(optimizer='adam', loss='mae')
-    # auto_encoder.compile(
-    #     loss='mae',
-    #     metrics=['mae'],
-    #     optimizer='adam'
-    # )
-    autoencoder.summary()
+    # Define parameter grid for grid search
+    param_grid = {'epochs': [25, 50, 75, 100], 'batch_size': [8, 16, 24, 32, 40]}
 
-    autoencoder.fit(y_train, y_train, epochs=20, batch_size=32, shuffle=False, validation_data=(y_test, y_test))
+    # Define grid search object
+    # cv: The number of cross-validation folds to be used in the grid search.
+    grid_search = GridSearchCV(autoencoder, param_grid, scoring='neg_mean_squared_error', cv=5)
 
-    encoder = Model(inputs=input_dim, outputs=encoded13)
+    # Fit grid search object to training data
+    grid_search.fit(y_train, y_train, shuffle=False)
+
+    # Print best parameters
+    print("Best parameters: ", grid_search.best_params_)
+
+
+    #autoencoder.fit(y_train, y_train, epochs=20, batch_size=32, shuffle=False)
+
+    encoder = Model(inputs=input_dim, outputs=encoded)
     encoded_input = Input(shape=(encoding_dim,))
     encoded_train = pd.DataFrame(encoder.predict(y_train))
     encoded_train = encoded_train.add_prefix('feature_')
