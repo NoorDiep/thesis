@@ -46,6 +46,7 @@ def get_data(lag):
     # Load all data
     df_swap, dates = read_file(file='SwapDriverData1.xlsx', sheet='Swap')
     df_drivers = read_file(file='SwapDriverData1.xlsx', sheet='Driver')
+    depo = read_file(file='SwapDriverData1.xlsx', sheet='DEPO')
     df_drivers = df_drivers.drop('Vol', axis=1)
     diff_swap = difference_series(df_swap, lag)
     df_drivers_diff = df_drivers.iloc[lag:]  # Cut off first n observations
@@ -56,6 +57,12 @@ def get_data(lag):
     # Create train, validation and test set
     df_drivers = df_drivers.reset_index(drop=True)
     df_swap = df_swap.reset_index(drop=True)
+
+    # Selected set for descriptive statistics
+    df_crisis = diff_swap[:1433];
+    df_post_crisis = diff_swap[1433:]
+    get_ds(df_crisis)
+    get_ds(df_post_crisis)
 
     x_train, x_test, y_train, y_test = train_test_split(df_drivers, df_swap, test_size=0.2, shuffle=False)
     x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.25, shuffle=False)
@@ -75,13 +82,13 @@ def get_data(lag):
     date_train_diff = dates[lag:y_train_diff.shape[0]]
     date_test_diff = dates[y_train_diff.shape[0]:len(dates)-lag]
 
-    return data_full, data, data_diff, date_train, date_test, date_train_diff, date_test_diff
+    return data_full, data, data_diff, date_train, date_test, date_train_diff, date_test_diff, depo
 
-def getDataTablesFigures(df_swap, df_drivers, diff_swap):
+def getDataTablesFigures(df_swap, df_drivers, diff_swap, depo):
     # Get descriptive statistics and corrlation matrix
-    ds_swap, ds_swap_latex = get_ds(df_swap)
-    ds_drivers, ds_drivers_latex = get_ds(df_drivers)
-    ds_diff, ds_diff_latex = get_ds(diff_swap)
+    ds_swap = get_ds(df_swap)
+    ds_drivers = get_ds(df_drivers)
+    ds_diff = get_ds(diff_swap)
 
     corr_drivers = df_drivers.corr().round(3)
 
@@ -161,13 +168,14 @@ def pacf_plot(df: pd.DataFrame, maxlags: int):
         plt.show()
 
 
-def get2dplot(df: pd.DataFrame, save: bool):
+def get2dplot(df: pd.DataFrame, depo_df: pd.DataFrame, save: bool):
     color = ["blue", "lightblue", "deepskyblue", "dodgerblue", "steelblue", "mediumblue", "darkblue", "slategrey",
              "gray", "black"]
     i = 0
     for column in df:
         df[column].plot(figsize=(15, 5), lw=1, color=color[i], label=column)
         i = i + 1
+    depo_df.plot(figsize=(15, 5), lw=1, color="red", label=column)
     plt.legend(ncol=2)
     plt.xlabel("Date")
     plt.ylabel("Eurozone swap rate")
@@ -286,6 +294,9 @@ def optimal_lag(x_train, x_tv, y_train, y_tv, maxlags_p, maxlags_q, indicator):
             for j in range(1, maxlags_q+1,1):
                 print(j)
                 # Create lagged exogenous variables
+
+
+
                 x_train_lagged = pd.DataFrame(x_train).shift(j).dropna()
                 x_tv_lagged = pd.DataFrame(x_tv).shift(j).dropna()
                 # ARX model
@@ -432,7 +443,7 @@ def buildAE(y_train, y_tv, y_test):
     encoded = Dense(3, activation='tanh')(input_dim)
 
     # Decoder Layers
-    decoded = Dense(ncol, activation='tanh')(encoded)
+    decoded = Dense(ncol, activation='linear')(encoded)
 
     # Combine Encoder and Deocder layers
     autoencoder = Model(inputs=input_dim, outputs=decoded)

@@ -10,7 +10,7 @@ import pandas as pd
 
 
 # Import data into 60% training, 20% validation and 20% test sets
-data, df, df_diff, date_train, date_test, date_train_diff, date_test_diff = get_data(lag=5)
+data, df, df_diff, date_train, date_test, date_train_diff, date_test_diff, depo_rate = get_data(lag=5)
 
 
 X_train = df[0]
@@ -37,7 +37,7 @@ X_tv = np.vstack((X_train, X_val))
 X_tv_diff = np.vstack((X_train_diff, X_val_diff))
 
 # Return tables and figures for Data section
-#getDataTablesFigures(data[0], data[1], pd.DataFrame(Y_diff)) # input: df_swap, df_drivers, swap_diff
+#getDataTablesFigures(data[0], data[1], pd.DataFrame(Y_diff), depo_rate) # input: df_swap, df_drivers, swap_diff
 
 ########################################################################################################################
 # FORECASTING METHODS
@@ -177,7 +177,7 @@ def getARX(x_train, x_tv, x_test, y_train, y_tv, y_test, h, plot_pred, dates):
         f_i = pd.DataFrame(np.concatenate(f_i), columns=['MEA', 'MSE', 'RMSE'])
         f_measures.append(f_i)
         means.append(np.mean(f_i))
-    return f_measures, means, results, idx_p_opt, idx_q_opt
+    return f_measures, pd.DataFrame(means), results, idx_p_opt, idx_q_opt
 
 
 """
@@ -366,7 +366,7 @@ def getARXPCA(means, PCs, x_train, x_tv, x_test, y_train, y_tv, y_test, y_s, h, 
             ARX = ARIMA(ytrain, exog=xtrain, order=(idx_p, 0, 0)).fit()
 
             # Forecast out-of-sample
-            preds_PC = ARX.predict(start=len(y_tv)+k, end=len(y_tv)+k + h - 1, dynamic=False) # Dynamic equal to False means direct forecasts
+            preds_PC = ARX.predict(start=len(y_tv)+k, end=len(y_tv)+k + h - 1, dynamic=False, exog=x[k-w:k+h-w+idx_q+k]) # Dynamic equal to False means direct forecasts
             f_k.append(preds_PC)
 
         # Transform out-of-sample PC forecasts back to swap rate out-of-sample forecasts
@@ -397,7 +397,7 @@ def getARXPCA(means, PCs, x_train, x_tv, x_test, y_train, y_tv, y_test, y_s, h, 
 """
 Principal component analysis
 """
-def getPCA(x_train, y_train, y_tv, y_test, n_max, forecast_period, method):
+def getPCA(x_train, x_tv, x_test, y_train, y_tv, y_test, n_max, forecast_period, method):
     # https://www.geeksforgeeks.org/implementing-pca-in-python-with-scikit-learn/?ref=rp
 
     pca = PCA()
@@ -428,7 +428,7 @@ def getPCA(x_train, y_train, y_tv, y_test, n_max, forecast_period, method):
         print(scree)
 
 
-        PC_tv = pca.transform(y_test)
+        PC_tv = pca.transform(y_tv)
         y_tvPC = np.dot(PC_tv, pca.components_) + np.array(np.mean(y_tv, axis=0))
         PC_tv_df = pd.DataFrame(PC_tv)
         PC_test = pca.transform(y_test)
@@ -447,7 +447,8 @@ def getPCA(x_train, y_train, y_tv, y_test, n_max, forecast_period, method):
             q_total = None
             t=1
         else:
-            f, f_mean, results, p, q = getARXPCA(x_train, X_tv, X_test, PC_train, PC_tv, PC_test, h=forecast_period, plot_pred=0, dates=date_test)
+
+            f, f_mean, results, p, q = getARXPCA(mu_total,  pca.components_, x_train, x_tv, x_test, PC_train, PC_tv, PC_test, y, h=forecast_period, plot_pred=0, dates=date_test)
             f_total.append(f_mean)
             p_total.append(p)
             q_total.append(q)
@@ -680,23 +681,38 @@ def getAE(x_train, x_tv, x_test, y_train, y_tv, y_test, forecast_horizon, foreca
 # f_PCA_meanh30, optPPCAh30, optQPCAh30, expl_varh30 = getPCA(X_train, Y_train, Y_tv, Y_test, n_max=5, forecast_period=30,  method='AR')
 # print(f_PCA_meanh30, optPPCAh30, optQPCAh30, expl_varh30)
 
-f_PCAd_meanh1, optPPCAdh1, optQPCAdh1, expl_vardh1 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=1,  method='AR')
-print(f_PCAd_meanh1, optPPCAdh1, optQPCAdh1, expl_vardh1)
-f_PCAd_meanh5, optPPCAdh5, optQPCAdh5, expl_vardh5 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=5,  method='AR')
-print(f_PCAd_meanh5, optPPCAdh5, optQPCAdh5, expl_vardh5)
-f_PCAd_meanh30, optPPCAdh30, optQPCAdh30, expl_vardh30 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=30,  method='AR')
-print(f_PCAd_meanh30, optPPCAdh30, optQPCAdh30, expl_vardh30)
+# f_PCAd_meanh1, optPPCAdh1, optQPCAdh1, expl_vardh1 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=1,  method='AR')
+# print(f_PCAd_meanh1, optPPCAdh1, optQPCAdh1, expl_vardh1)
+# f_PCAd_meanh5, optPPCAdh5, optQPCAdh5, expl_vardh5 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=5,  method='AR')
+# print(f_PCAd_meanh5, optPPCAdh5, optQPCAdh5, expl_vardh5)
+# f_PCAd_meanh30, optPPCAdh30, optQPCAdh30, expl_vardh30 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=30,  method='AR')
+# print(f_PCAd_meanh30, optPPCAdh30, optQPCAdh30, expl_vardh30)
+
+f_ARXh5, f_ARX_meanh5, resultsARXh5, ph5, qh5 = getARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, h=5, plot_pred=0, dates=date_test)
+print('ARX', f_ARX_meanh5, ph5 , qh5)
+f_ARXdh5, f_ARX_meandh5, resultsARXdh5, pdh5, qdh5 = getARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, h=5, plot_pred=0, dates=date_test)
+print('ARX', f_ARX_meandh5, pdh5 , qdh5)
 
 ################
 # PCA-ARX
 ################
-f_PCAX_meanh1, optPPCAXh1, optQPCAXh1, expl_varXh1 = getPCA(X_train, Y_train, Y_tv, Y_test, n_max=5, forecast_period=1,  method='ARX')
-f_PCAX_meanh5, optPPCAXh5, optQPCAXh5, expl_varXh5 = getPCA(X_train, Y_train, Y_tv, Y_test, n_max=5, forecast_period=5,  method='ARX')
-f_PCAX_meanh30, optPPCAXh30, optQPCAXh30, expl_varhX30 = getPCA(X_train, Y_train, Y_tv, Y_test, n_max=5, forecast_period=30,  method='ARX')
+# f_PCAX_meanh1, optPPCAXh1, optQPCAXh1, expl_varXh1 = getPCA(X_train, Y_train, Y_tv, Y_test, n_max=5, forecast_period=1,  method='ARX')
+# f_PCAX_meanh5, optPPCAXh5, optQPCAXh5, expl_varXh5 = getPCA(X_train, Y_train, Y_tv, Y_test, n_max=5, forecast_period=5,  method='ARX')
+# f_PCAX_meanh30, optPPCAXh30, optQPCAXh30, expl_varhX30 = getPCA(X_train, Y_train, Y_tv, Y_test, n_max=5, forecast_period=30,  method='ARX')
+#getARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, h=10, plot_pred=0, dates=date_test)
 
-f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=1,  method='ARX')
-f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=5,  method='ARX')
-f_PCAXd_meanh30, optPPCAXdh30, optQPCAXdh30, expl_varhX30 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=30,  method='ARX')
+f_PCAXd_meanh10, optPPCAXdh10, optQPCAXdh10, expl_varXh10 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=10,  method='AR')
+print(f_PCAXd_meanh10, optPPCAXdh10, optQPCAXdh10, expl_varXh10)
+f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=1,  method='AR')
+print(f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1)
+f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=5,  method='AR')
+print(f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5)
+f_PCAXd_meanh30, optPPCAXdh30, optQPCAXdh30, expl_varhX30 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=30,  method='AR')
+print(f_PCAXd_meanh10, optPPCAXdh10, optQPCAXdh10, expl_varXh10)
+print(f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1)
+print(f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5)
+print(f_PCAXd_meanh30, optPPCAXdh30, optQPCAXdh30, expl_varhX30)
+
 t=1
 #resultsPCA_ARX = getPCA(X_train, X_test, Y_train, Y_test, dates=date_test, forecast_method='ARX')
 #resultsAE_AR = getAE(X_train, X_test, Y_train, Y_test, plot_pred=0, dates=date_test, forecast_method='AR')
