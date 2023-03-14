@@ -301,19 +301,24 @@ def getARPCA(means, PCs, y_train, y_tv, y_test, y_s, h, plot_pred, dates):
 
         # Get forecast accuracy
         acc_AR = forecast_accuracy(preds_AR_s, test, df_indicator=0)
-        f_mae.append(np.mean(acc_AR.iloc[0]['mae']))
-        f_mse.append(np.mean(acc_AR.iloc[0]['mse']))
-        f_rmse.append(np.mean(acc_AR.iloc[0]['rmse']))
+        f_mae.append(acc_AR.iloc[0]['mae'])
+        f_mse.append(acc_AR.iloc[0]['mse'])
+        f_rmse.append(acc_AR.iloc[0]['rmse'])
         results.append(preds_AR_s)
-        fmsr = [np.mean(f_mae), np.mean(f_mse), np.mean(f_rmse)]
-        f_i.append(pd.DataFrame(fmsr).T)
-        t=1
-    f = pd.DataFrame(np.concatenate(f_i), columns=['MEA', 'MSE', 'RMSE'])
-    f_measures.append(f)
-    mean.append(np.mean(f))
-    idx_p.append(idx)
+        t = 1
+    f_mae1 = pd.DataFrame(f_mae)
+    f_mse1 = pd.DataFrame(f_mse)
+    f_rmse1 = pd.DataFrame(f_rmse)
+    # f_measures.append(f)
 
-    return f_measures, mean, results, idx_p
+    mean_mae = np.mean(f_mae1)
+    mean_mse = np.mean(f_mse1)
+    mean_rmse = np.mean(f_rmse1)
+    mean = [mean_mae, mean_mse, mean_rmse]
+
+    mean_df = pd.DataFrame(mean).T
+
+    return f_measures, mean_df, results, idx_p
 """
 Principal component analysis ARX
 """
@@ -380,19 +385,25 @@ def getARXPCA(means, PCs, x_train, x_tv, x_test, y_train, y_tv, y_test, y_s, h, 
 
         # Get forecast accuracy
         acc_AR = forecast_accuracy(preds_ARX_s, test, df_indicator=0)
-        f_mae.append(np.mean(acc_AR.iloc[0]['mae']))
-        f_mse.append(np.mean(acc_AR.iloc[0]['mse']))
-        f_rmse.append(np.mean(acc_AR.iloc[0]['rmse']))
+        f_mae.append(acc_AR.iloc[0]['mae'])
+        f_mse.append(acc_AR.iloc[0]['mse'])
+        f_rmse.append(acc_AR.iloc[0]['rmse'])
         results.append(preds_ARX_s)
-        fmsr = [np.mean(f_mae), np.mean(f_mse), np.mean(f_rmse)]
-        f_i.append(pd.DataFrame(fmsr).T)
-        t=1
-    f = pd.DataFrame(np.concatenate(f_i), columns=['MEA', 'MSE', 'RMSE'])
-    f_measures.append(f)
-    mean.append(np.mean(f))
+        t = 1
+    f_mae1 = pd.DataFrame(f_mae)
+    f_mse1 = pd.DataFrame(f_mse)
+    f_rmse1 = pd.DataFrame(f_rmse)
+    # f_measures.append(f)
+
+    mean_mae = np.mean(f_mae1)
+    mean_mse = np.mean(f_mse1)
+    mean_rmse = np.mean(f_rmse1)
+    mean = [mean_mae, mean_mse, mean_rmse]
+
+    mean_df = pd.DataFrame(mean).T
 
 
-    return f_measures, mean, results, idx_p_opt, idx_q_opt
+    return f_measures, mean_df, results, idx_p_opt, idx_q_opt
 
 """
 Principal component analysis
@@ -688,10 +699,12 @@ def getAE(x_train, x_tv, x_test, y_train, y_tv, y_test, forecast_horizon, foreca
 # f_PCAd_meanh30, optPPCAdh30, optQPCAdh30, expl_vardh30 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=30,  method='AR')
 # print(f_PCAd_meanh30, optPPCAdh30, optQPCAdh30, expl_vardh30)
 
-f_ARXh5, f_ARX_meanh5, resultsARXh5, ph5, qh5 = getARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, h=5, plot_pred=0, dates=date_test)
-print('ARX', f_ARX_meanh5, ph5 , qh5)
-f_ARXdh5, f_ARX_meandh5, resultsARXdh5, pdh5, qdh5 = getARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, h=5, plot_pred=0, dates=date_test)
-print('ARX', f_ARX_meandh5, pdh5 , qdh5)
+# f_ARXh5, f_ARX_meanh5, resultsARXh5, ph5, qh5 = getARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, h=5, plot_pred=0, dates=date_test)
+# print('ARX', f_ARX_meanh5, ph5 , qh5)
+# f_ARXdh5, f_ARX_meandh5, resultsARXdh5, pdh5, qdh5 = getARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, h=5, plot_pred=0, dates=date_test)
+# print('ARX', f_ARX_meandh5, pdh5 , qdh5)
+
+
 
 ################
 # PCA-ARX
@@ -703,11 +716,11 @@ print('ARX', f_ARX_meandh5, pdh5 , qdh5)
 
 f_PCAXd_meanh10, optPPCAXdh10, optQPCAXdh10, expl_varXh10 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=10,  method='AR')
 print(f_PCAXd_meanh10, optPPCAXdh10, optQPCAXdh10, expl_varXh10)
-f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=1,  method='AR')
+f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=1,  method='AR')
 print(f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1)
-f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=5,  method='AR')
+f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=5,  method='AR')
 print(f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5)
-f_PCAXd_meanh30, optPPCAXdh30, optQPCAXdh30, expl_varhX30 = getPCA(X_train, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=30,  method='AR')
+f_PCAXd_meanh30, optPPCAXdh30, optQPCAXdh30, expl_varhX30 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=30,  method='AR')
 print(f_PCAXd_meanh10, optPPCAXdh10, optQPCAXdh10, expl_varXh10)
 print(f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1)
 print(f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5)
