@@ -21,6 +21,7 @@ from keras import layers
 from keras.layers import Dense,Conv2D,MaxPooling2D,UpSampling2D
 from keras import Input, Model
 from keras import Model
+from keras.wrappers.scikit_learn import KerasClassifier
 from keras import Sequential
 from keras.datasets import mnist
 
@@ -448,33 +449,41 @@ def buildAE(y_train, y_tv, y_test):
     # Combine Encoder and Deocder layers
     autoencoder = Model(inputs=input_dim, outputs=decoded)
 
+
+    encoder = Model(inputs=input_dim, outputs=encoded)
+    encoded_input = Input(shape=(encoding_dim,))
+    decoder_layer = autoencoder.layers[-1]
+    decoder = Model(inputs=encoded_input, outputs=decoder_layer(encoded_input))
+
+    autoencoder.compile(optimizer='Nadam', loss='mean_squared_error')
+
     # Define parameter grid for grid search
-    param_grid = {'epochs': [25, 50, 75, 100], 'batch_size': [8, 16, 24, 32, 40]}
+    #param_grid = {'epochs': [25, 50, 75, 100], 'batch_size': [8, 16, 24, 32, 40]}
 
-    # Define grid search object
-    # cv: The number of cross-validation folds to be used in the grid search.
-    grid_search = GridSearchCV(autoencoder, param_grid, scoring='neg_mean_squared_error', cv=5)
-
-    # Fit grid search object to training data
-    grid_search.fit(y_tv, y_train, shuffle=False)
+    autoencoder.fit(y_train, y_train,
+                    epochs=150,
+                    batch_size=50,
+                    shuffle=True,
+                    validation_data=(y_tv[len(y_train):], y_tv[len(y_train):]))
 
     # Print best parameters
-    print("Best parameters: ", grid_search.best_params_)
+    #print("Best parameters: ", grid_search.best_params_)
 
 
     #autoencoder.fit(y_train, y_train, epochs=20, batch_size=32, shuffle=False)
 
-    encoder = Model(inputs=input_dim, outputs=encoded)
+
     encoded_input = Input(shape=(encoding_dim,))
     encoded_train = pd.DataFrame(encoder.predict(y_train))
     encoded_train = encoded_train.add_prefix('feature_')
 
     encoded_tv = pd.DataFrame(encoder.predict(y_tv))
+    encoded_tv = encoded_tv.add_prefix('feature_')
 
     encoded_test = pd.DataFrame(encoder.predict(y_test))
     encoded_test = encoded_test.add_prefix('feature_')
 
-    decoder = Model(inputs=autoencoder.input, outputs=autoencoder.get_layer('decoded').output)
+
 
     return encoded_train, encoded_tv, encoded_test, decoder
 

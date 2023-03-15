@@ -256,8 +256,6 @@ def getARPCA(means, PCs, y_train, y_tv, y_test, y_s, h, plot_pred, dates):
     w = y_tv.shape[0]
     f_measures = []
     results = []
-    idx_p =[]
-    mean = []
 
     # Get the number of columns
     try:
@@ -266,14 +264,14 @@ def getARPCA(means, PCs, y_train, y_tv, y_test, y_s, h, plot_pred, dates):
         #
         cols = 1
 
-    idx_PC = []
+    idx_p_opt = []
     # Loop over each column
     for i in range(cols):
         print(i)
 
         # Compute the optimal model; 1 indicating ARX model, AR model otherwise
         idx = optimal_lag(x_train=0, x_tv=0, y_train=y[:n_train,i], y_tv=y[:n_tv,i], maxlags_p=10, maxlags_q=10, indicator=0)
-        idx_PC.append(idx)
+        idx_p_opt.append(idx)
 
     f_mae = []
     f_mse = []
@@ -318,7 +316,7 @@ def getARPCA(means, PCs, y_train, y_tv, y_test, y_s, h, plot_pred, dates):
 
     mean_df = pd.DataFrame(mean).T
 
-    return f_measures, mean_df, results, idx_p
+    return f_measures, mean_df, results, idx_p_opt
 """
 Principal component analysis ARX
 """
@@ -516,9 +514,9 @@ def getARAE(decoder, encoded_train, encoded_tv, encoded_test, y, h, dates):
             # Forecast out-of-sample
             preds_PC = AR.predict(start=len(encoded_tv)+k, end=len(encoded_tv)+k + h - 1, dynamic=False) # Dynamic equal to False means direct forecasts
             f_k.append(preds_PC)
-        preds_AR = pd.DataFrame(f_k) # size: h * #neurons z in encoded unit
+        preds_AR = pd.DataFrame(f_k).T # size: h * #neurons z in encoded unit
         preds_AR_s = decoder.predict(preds_AR) #sizeL h * #tenors in swap rate unit
-        preds_AR_s= pd.DataFrame(preds_AR_s)
+        preds_AR_s= pd.DataFrame(preds_AR_s).T
         preds_AR_s.index = dates.iloc[k:k+h]
         test = y[len(encoded_tv)+k:len(encoded_tv)+k + h, ]
         test = pd.DataFrame(test)
@@ -526,19 +524,24 @@ def getARAE(decoder, encoded_train, encoded_tv, encoded_test, y, h, dates):
 
         # Get forecast accuracy
         acc_AR = forecast_accuracy(preds_AR_s, test, df_indicator=0)
-        f_mae.append(np.mean(acc_AR.iloc[0]['mae']))
-        f_mse.append(np.mean(acc_AR.iloc[0]['mse']))
-        f_rmse.append(np.mean(acc_AR.iloc[0]['rmse']))
+        f_mae.append(acc_AR.iloc[0]['mae'])
+        f_mse.append(acc_AR.iloc[0]['mse'])
+        f_rmse.append(acc_AR.iloc[0]['rmse'])
         results.append(preds_AR_s)
-        fmsr = [np.mean(f_mae), np.mean(f_mse), np.mean(f_rmse)]
-        f_i.append(pd.DataFrame(fmsr).T)
-        t=1
-    f = pd.DataFrame(np.concatenate(f_i), columns=['MEA', 'MSE', 'RMSE'])
-    f_measures.append(f)
-    mean.append(np.mean(f))
-    idx_p.append(idx)
+        t = 1
+    f_mae1 = pd.DataFrame(f_mae)
+    f_mse1 = pd.DataFrame(f_mse)
+    f_rmse1 = pd.DataFrame(f_rmse)
+    # f_measures.append(f)
 
-    return f_measures, mean, results, idx_p
+    mean_mae = np.mean(f_mae1)
+    mean_mse = np.mean(f_mse1)
+    mean_rmse = np.mean(f_rmse1)
+    mean = [mean_mae, mean_mse, mean_rmse]
+
+    mean_df = pd.DataFrame(mean).T
+
+    return f_measures, mean_df, results, idx_p
 
 """
 Autoencoder ARX
@@ -606,19 +609,23 @@ def getARXAE(decoder, x_train, x_tv, x_test, encoded_train, encoded_tv, encoded_
 
         # Get forecast accuracy
         acc_AR = forecast_accuracy(preds_ARX_s, test, df_indicator=0)
-        f_mae.append(np.mean(acc_AR.iloc[0]['mae']))
-        f_mse.append(np.mean(acc_AR.iloc[0]['mse']))
-        f_rmse.append(np.mean(acc_AR.iloc[0]['rmse']))
+        f_mae.append(acc_AR.iloc[0]['mae'])
+        f_mse.append(acc_AR.iloc[0]['mse'])
+        f_rmse.append(acc_AR.iloc[0]['rmse'])
         results.append(preds_ARX_s)
-        fmsr = [np.mean(f_mae), np.mean(f_mse), np.mean(f_rmse)]
-        f_i.append(pd.DataFrame(fmsr).T)
-        t=1
-    f = pd.DataFrame(np.concatenate(f_i), columns=['MEA', 'MSE', 'RMSE'])
-    f_measures.append(f)
-    mean.append(np.mean(f))
+        t = 1
+    f_mae1 = pd.DataFrame(f_mae)
+    f_mse1 = pd.DataFrame(f_mse)
+    f_rmse1 = pd.DataFrame(f_rmse)
+    # f_measures.append(f)
 
+    mean_mae = np.mean(f_mae1)
+    mean_mse = np.mean(f_mse1)
+    mean_rmse = np.mean(f_rmse1)
+    mean = [mean_mae, mean_mse, mean_rmse]
 
-    return f_measures, mean, results, idx_p_opt, idx_q_opt
+    mean_df = pd.DataFrame(mean).T
+    return f_measures, mean_df, results, idx_p_opt, idx_q_opt
 
 """
 Autoencoder factor analysis
@@ -714,17 +721,17 @@ def getAE(x_train, x_tv, x_test, y_train, y_tv, y_test, forecast_horizon, foreca
 # f_PCAX_meanh30, optPPCAXh30, optQPCAXh30, expl_varhX30 = getPCA(X_train, Y_train, Y_tv, Y_test, n_max=5, forecast_period=30,  method='ARX')
 #getARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, h=10, plot_pred=0, dates=date_test)
 
-f_PCAXd_meanh10, optPPCAXdh10, optQPCAXdh10, expl_varXh10 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=10,  method='AR')
-print(f_PCAXd_meanh10, optPPCAXdh10, optQPCAXdh10, expl_varXh10)
-f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=1,  method='AR')
-print(f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1)
-f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=5,  method='AR')
-print(f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5)
-f_PCAXd_meanh30, optPPCAXdh30, optQPCAXdh30, expl_varhX30 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=30,  method='AR')
-print(f_PCAXd_meanh10, optPPCAXdh10, optQPCAXdh10, expl_varXh10)
-print(f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1)
-print(f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5)
-print(f_PCAXd_meanh30, optPPCAXdh30, optQPCAXdh30, expl_varhX30)
+# f_PCAXd_meanh10, optPPCAXdh10, optQPCAXdh10, expl_varXh10 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=10,  method='AR')
+# print(f_PCAXd_meanh10, optPPCAXdh10, optQPCAXdh10, expl_varXh10)
+# f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=1,  method='AR')
+# print(f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1)
+# f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=5,  method='AR')
+# print(f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5)
+# f_PCAXd_meanh30, optPPCAXdh30, optQPCAXdh30, expl_varhX30 = getPCA(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, n_max=5, forecast_period=30,  method='AR')
+# print(f_PCAXd_meanh10, optPPCAXdh10, optQPCAXdh10, expl_varXh10)
+# print(f_PCAXd_meanh1, optPPCAXdh1, optQPCAXdh1, expl_varXh1)
+# print(f_PCAXd_meanh5, optPPCAXdh5, optQPCAXdh5, expl_varXh5)
+# print(f_PCAXd_meanh30, optPPCAXdh30, optQPCAXdh30, expl_varhX30)
 
 t=1
 #resultsPCA_ARX = getPCA(X_train, X_test, Y_train, Y_test, dates=date_test, forecast_method='ARX')
@@ -734,16 +741,16 @@ t=1
 ################
 # AE-AR & AE-ARX
 ################
-AE_ARh10, meanAE_ARh10, resultsAE_ARh10, AE_pARh10, AE_ARXh10, meanAE_ARXh10, resultsAE_ARXh10, AE_pARXh10, AE_qARXh10 = getAE(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, forecast_horizon=10, forecast_method='Both')
+#AE_ARh10, meanAE_ARh10, resultsAE_ARh10, AE_pARh10, AE_ARXh10, meanAE_ARXh10, resultsAE_ARXh10, AE_pARXh10, AE_qARXh10 = getAE(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, forecast_horizon=10, forecast_method='Both')
 AE_ARdh10, meanAE_ARdh10, resultsAE_ARdh10, AE_pARdh10, AE_ARXdh10, meanAE_ARXdh10, resultsAE_ARXdh10, AE_pARXdh10, AE_qARXdh10 = getAE(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, forecast_horizon=10, forecast_method='Both')
 
-AE_ARh1, meanAE_ARh1, resultsAE_ARh1, AE_pARh1, AE_ARXh1, meanAE_ARXh1, resultsAE_ARXh1, AE_pARXh1, AE_qARXh1 = getAE(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, forecast_horizon=1, forecast_method='Both')
+#AE_ARh1, meanAE_ARh1, resultsAE_ARh1, AE_pARh1, AE_ARXh1, meanAE_ARXh1, resultsAE_ARXh1, AE_pARXh1, AE_qARXh1 = getAE(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, forecast_horizon=1, forecast_method='Both')
 AE_ARdh1, meanAE_ARdh1, resultsAE_ARdh1, AE_ARdh1, AE_ARXdh1, meanAE_ARXdh1, resultsAE_ARXdh1, AE_pARXdh1, AE_qARXdh1 = getAE(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, forecast_horizon=1, forecast_method='Both')
 
-AE_ARh5, meanAE_ARh5, resultsAE_ARh5, AE_pARh5, AE_ARXh5, meanAE_ARXh5, resultsAE_ARXh5, AE_pARXh5, AE_qARXh5 = getAE(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, forecast_horizon=5, forecast_method='Both')
+#AE_ARh5, meanAE_ARh5, resultsAE_ARh5, AE_pARh5, AE_ARXh5, meanAE_ARXh5, resultsAE_ARXh5, AE_pARXh5, AE_qARXh5 = getAE(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, forecast_horizon=5, forecast_method='Both')
 AE_ARdh5, meanAE_ARdh5, resultsAE_ARdh5, AE_pARdh5, AE_ARXdh5, meanAE_ARXdh5, resultsAE_ARXdh5, AE_pARXdh5, AE_qARXdh5 = getAE(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, forecast_horizon=5, forecast_method='Both')
 
-AE_ARh30, meanAE_ARh30, resultsAE_ARh30, AE_pARh30, AE_ARXh30, meanAE_ARXh30, resultsAE_ARXh30, AE_pARXh30, AE_qARXh30 = getAE(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, forecast_horizon=30, forecast_method='Both')
+#AE_ARh30, meanAE_ARh30, resultsAE_ARh30, AE_pARh30, AE_ARXh30, meanAE_ARXh30, resultsAE_ARXh30, AE_pARXh30, AE_qARXh30 = getAE(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, forecast_horizon=30, forecast_method='Both')
 AE_ARdh30, meanAE_ARdh30, resultsAE_ARdh30, AE_pARdh30, AE_ARXdh30, meanAE_ARXdh30, resultsAE_ARXdh30, AE_pARXdh30, AE_qARXdh30 = getAE(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, forecast_horizon=30, forecast_method='Both')
 
 
