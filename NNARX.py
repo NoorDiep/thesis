@@ -1,3 +1,5 @@
+import itertools
+
 from Drivers import get_data, forecast_accuracy, optimal_lag, getDataTablesFigures
 import numpy as np
 import pandas as pd
@@ -72,17 +74,17 @@ def forecastNNARX(x_train, x_tv, x_test, y_train, y_tv, y_test, y_swap, n_train,
     model.compile(loss='mae', optimizer='adam')
 
     #
-    # epochs_list = [50, 100, 150, 200, 250]
-    # batch_size_list = [8, 16, 24, 32, 40, 48, 56]
-    # params = {}
-    # for epochs, batch_size in itertools.product(epochs_list, batch_size_list):
-    #     fitted = model.fit(df_x[:n_train], y_train, epochs=epochs, batch_size=batch_size, shuffle=False,
-    #                              validation_data=(df_x[n_train:n_tv], y_tv[n_train:]))
-    #     fitted_loss = fitted.history['val_loss'][-1]
-    #     params[(epochs, batch_size)] = fitted_loss
-    #
-    # opt_params = min(params, key=params.get)
-    opt_params = [100,32]
+    epochs_list = [50, 100, 150, 200, 250]
+    batch_size_list = [8, 16, 24, 32, 40, 48, 56]
+    params = {}
+    for epochs, batch_size in itertools.product(epochs_list, batch_size_list):
+        fitted = model.fit(df_x[:n_train], y_train, epochs=epochs, batch_size=batch_size, shuffle=False,
+                                 validation_data=(df_x[n_train:n_tv], y_tv[n_train:]))
+        fitted_loss = fitted.history['val_loss'][-1]
+        params[(epochs, batch_size)] = fitted_loss
+
+    opt_params = min(params, key=params.get)
+    # opt_params = [100,32]
     model.fit(df_x[:n_tv], y_tv, epochs=opt_params[0], batch_size=opt_params[1], shuffle=False)
 
     print('Opt params:', opt_params)
