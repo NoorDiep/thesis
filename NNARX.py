@@ -110,9 +110,9 @@ def forecastNNARX(x_train, x_tv, x_test, y_train, y_tv, y_test, y_swap, n_train,
     return results1, opt_params
 
 y_swap = np.vstack((Y_tv_diff, Y_test_diff))
-results10_n3 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+results10_n3, param10_n3 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
                         n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), hidden_nodes=3,  h=10)
-results10_n2 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+results10_n2, param10_n2 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
                         n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), hidden_nodes=2,  h=10)
-results10_n4 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+results10_n4, param10_n4 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
                         n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), hidden_nodes=4,  h=10)
