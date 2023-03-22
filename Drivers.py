@@ -1,7 +1,7 @@
-import pandas as pd
 import numpy as np
 from matplotlib import pyplot
 from sklearn.model_selection import train_test_split, GridSearchCV
+import pandas as pd
 
 from statsmodels.tools import add_constant
 from statsmodels.stats.outliers_influence import variance_inflation_factor
@@ -14,16 +14,11 @@ from statsmodels.graphics.tsaplots import plot_pacf
 from statsmodels.tsa.ar_model import AutoReg
 from statsmodels.tsa.arima.model import ARIMA
 import statsmodels.api as sm
-from mpl_toolkits.mplot3d import Axes3D
 
-import keras
-from keras import layers
 from keras.layers import Dense,Conv2D,MaxPooling2D,UpSampling2D
 from keras import Input, Model
 from keras import Model
-from keras.wrappers.scikit_learn import KerasClassifier
-from keras import Sequential
-from keras.datasets import mnist
+
 
 
 
@@ -90,6 +85,7 @@ def get_data(lag):
 
     df_drivers = pd.DataFrame([df_drivers['EcSu'],df_drivers_diff['Sent'],df_drivers['Stress'],df_drivers['PoUn'],df_drivers_diff['News'],df_drivers['Infl']]).T
 
+
     print(sm.OLS(df_swap['10Y'], add_constant(df_drivers)).fit().summary())
     #print(sm.OLS(diff_swap['10Y'], add_constant(df_drivers_diff)).fit().summary())
 
@@ -98,6 +94,8 @@ def get_data(lag):
     df_post_crisis = diff_swap[1433:]
     get_ds(df_crisis)
     get_ds(df_post_crisis)
+
+
 
     x_train, x_test, y_train, y_test = train_test_split(df_drivers, df_swap, test_size=0.2, shuffle=False)
     x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.25, shuffle=False)
@@ -111,6 +109,10 @@ def get_data(lag):
     # x_train_diff, x_test_diff, y_train_diff, y_test_diff = train_test_split(df_drivers_diff, df_spread_diff, test_size=0.2, shuffle=False)
     # x_train_diff, x_val_diff, y_train_diff, y_val_diff = train_test_split(x_train_diff, y_train_diff, test_size=0.25, shuffle=False)
 
+
+
+    #x_train, x_test, y_train, y_test = train_test_split(df_drivers, df_swap, test_size=0.2, shuffle=False)
+    #x_train_diff, x_test_diff, y_train_diff, y_test_diff = train_test_split(df_drivers_diff, diff_swap, test_size=0.2, shuffle=False)
 
     data_full = [df_swap, df_drivers, diff_swap, df_drivers_diff]
     data = [x_train, x_val, x_test, y_train, y_val, y_test]
@@ -171,7 +173,6 @@ def getDataTablesFigures(df_swap, df_drivers, diff_swap, diff_drivers, depo, df_
     return corr_swap, corr_swap_diff
 
 
-
 def get_ds(df: pd.DataFrame):
     # Calculate descriptive statistics
     mean = df.mean()
@@ -227,15 +228,17 @@ def pacf_plot(df: pd.DataFrame, maxlags: int):
         plt.show()
 
 
-def get2dplot(df: pd.DataFrame, depo_df: pd.DataFrame, save: bool):
+def get2dplot(df_swap: pd.DataFrame, depo_df: pd.DataFrame, df_swap_dates, save: bool):
     color = ["blue", "lightblue", "deepskyblue", "dodgerblue", "steelblue", "mediumblue", "darkblue", "slategrey",
-             "gray", "black"]
+             "gray", "black", "red"]
     i = 0
-    for column in df:
-        df[column].plot(figsize=(15, 5), lw=1, color=color[i], label=column)
+    df_swap_dates['DEPO'] = depo_df
+    for column in df_swap_dates:
+        df_swap_dates[column].plot(figsize=(15, 5), lw=1, color=color[i], label=column)
         i = i + 1
-    depo_df.plot(figsize=(15, 5), lw=1, color="red", label=column)
-    plt.legend(ncol=2)
+
+    plt.legend(ncol=3)
+    plt.show()
     plt.xlabel("Date")
     plt.ylabel("Eurozone swap rate")
     #plt.title("The Eurzone term structure of interest swap rate")
@@ -310,6 +313,7 @@ def adf_test(df, df_diff):
 
     return ADF_df, ADF_diff
 
+
 def getadf_values(df: list, indicator_diff):
     ADF_c = []
     ADF_ct = []
@@ -361,6 +365,9 @@ def getadf_values_exog(df: list):
     results = results.round(3)
     return results
 
+
+
+
 def optimal_lag(x_train, x_tv, y_train, y_tv, maxlags_p, maxlags_q, indicator):
 
     BIC = []
@@ -373,23 +380,28 @@ def optimal_lag(x_train, x_tv, y_train, y_tv, maxlags_p, maxlags_q, indicator):
         if indicator == 1:
             BIC_inter = []
             for j in range(1, maxlags_q+1,1):
+                print(j)
                 # Create lagged exogenous variables
+
+
+
                 x_train_lagged = pd.DataFrame(x_train).shift(j).dropna()
                 x_tv_lagged = pd.DataFrame(x_tv).shift(j).dropna()
                 # ARX model
-                model = AutoReg(endog=y_train[:y_train.size-j], exog=x_train_lagged, lags=i)
+                #model = AutoReg(endog=dep, exog=x_train1, lags=i)
+                model = ARIMA(endog=y_train[:y_train.size - j], exog=x_train_lagged, order=(i, 0, 0))
+                #model = ARIMA(endog=y_train[:y_train.size-j], exog=x_train_lagged, order=(i,0,0))
+                #model = sm.tsa.ARMAX(y_train, x_train, order=(i, j))
 
                 try:
                     result = model.fit()
                 except:
-                    result = []
                     print('Error at lag ', i)
                     pass
 
                 BIC_inter.append(result.bic)
-            q = BIC_inter.index(min(BIC_inter)) + 1
-            idx_q.append(q)
-            BIC.append(BIC_inter[q-1])
+            idx_q.append(BIC_inter.index(min(BIC_inter)) + 1)
+            BIC.append(BIC_inter)
         else:
             # AR model
             #model = AutoReg(endog=dep, lags=i)
@@ -457,30 +469,22 @@ def plot_forecast(pred, test):
 # Forecast accuracy measures
 def forecast_accuracy(forecast, actual, df_indicator):
     if df_indicator:
-        mape = []
-        me = []
+
         mae = []
-        mpe = []
         mse = []
         rmse = []
-        corr = []
+        errors = []
 
         for column in actual:
-            mape.append(np.mean(np.abs(forecast[column] - actual[column]) / np.abs(actual[column])))
-            me.append(np.mean(forecast[column] - actual[column]))  # ME
-            mae.append(np.mean(np.abs(forecast[column] - actual[column])))  # MAE
-            mpe.append(np.mean((forecast[column] - actual[column]) / actual[column]))  # MPE
-            mse.append(np.mean((forecast[column] - actual[column]) ** 2) )  # MSE
-            rmse.append(np.mean((forecast[column] - actual[column]) ** 2) ** .5)  # RMSE
-            corr.append(np.corrcoef(forecast[column], actual[column])[0, 1])  # corr
-        #print('mape: ', mape)
-        #print('me:', me)
-        print('mae:', mae)
-        #print('mpe:', mpe)
-        print('mse:', mse)
-        print('rmse:', rmse)
-        #print('corr:', corr)
-        return
+            MAE = np.mean(np.abs(forecast[column] - actual[column]))
+            mae.append(MAE)  # MAE
+            MSE = np.mean((forecast[column] - actual[column]) ** 2)
+            mse.append(MSE)  # MSE
+            RMSE = np.mean((forecast[column] - actual[column]) ** 2) ** .5
+            rmse.append(RMSE)  # RMSE
+            errors.append([MAE, MSE, RMSE])
+
+        return pd.DataFrame(errors)
 
     else:
         mape = np.mean(np.abs(forecast - actual)/np.abs(actual))  # MAPE
@@ -525,71 +529,35 @@ def buildAE(y_train, y_tv, y_test):
     # Combine Encoder and Deocder layers
     autoencoder = Model(inputs=input_dim, outputs=decoded)
 
-
-    encoder = Model(inputs=input_dim, outputs=encoded)
-    encoded_input = Input(shape=(encoding_dim,))
-    decoder_layer = autoencoder.layers[-1]
-    decoder = Model(inputs=encoded_input, outputs=decoder_layer(encoded_input))
-
-    autoencoder.compile(optimizer='Nadam', loss='mean_squared_error')
-
     # Define parameter grid for grid search
-    #param_grid = {'epochs': [25, 50, 75, 100], 'batch_size': [8, 16, 24, 32, 40]}
+    param_grid = {'epochs': [25, 50, 75, 100], 'batch_size': [8, 16, 24, 32, 40]}
 
-    autoencoder.fit(y_train, y_train,
-                    epochs=150,
-                    batch_size=50,
-                    shuffle=True,
-                    validation_data=(y_tv[len(y_train):], y_tv[len(y_train):]))
+    # Define grid search object
+    # cv: The number of cross-validation folds to be used in the grid search.
+    grid_search = GridSearchCV(autoencoder, param_grid, scoring='neg_mean_squared_error', cv=5)
+
+    # Fit grid search object to training data
+    grid_search.fit(y_tv, y_train, shuffle=False)
 
     # Print best parameters
-    #print("Best parameters: ", grid_search.best_params_)
+    print("Best parameters: ", grid_search.best_params_)
 
 
     #autoencoder.fit(y_train, y_train, epochs=20, batch_size=32, shuffle=False)
 
-
+    encoder = Model(inputs=input_dim, outputs=encoded)
     encoded_input = Input(shape=(encoding_dim,))
     encoded_train = pd.DataFrame(encoder.predict(y_train))
     encoded_train = encoded_train.add_prefix('feature_')
 
     encoded_tv = pd.DataFrame(encoder.predict(y_tv))
-    encoded_tv = encoded_tv.add_prefix('feature_')
 
     encoded_test = pd.DataFrame(encoder.predict(y_test))
     encoded_test = encoded_test.add_prefix('feature_')
 
-
-
-    return encoded_train, encoded_tv, encoded_test, decoder
-
-def buildNNARX(x_train, x_tv, x_test, y_train, y_tv, y_test, p):
-    # https://www.kaggle.com/code/saivarunk/dimensionality-reduction-using-keras-auto-encoder
-
-    ncol = y_train.shape[1]
-    n_train = y_train.shape[0]
-    n_exog = x_train.shape[1]
-    encoding_dim = 3
-
-    model = Sequential()
-    model.add(Dense(50, activation='relu', input_shape=(p * (1 + n_exog),)))
-    model.add(Dense(1))
-
-    # Compile the model
-    model.compile(loss='mse', optimizer='adam')
-
-    # Train the model
-    model.fit(x_train, y_train, epochs=100, batch_size=32, validation_data=(x_tv[n_train:], y_tv[n_train:]))
-
-    # Use the trained model to predict the endogenous time series for future time steps
-    h = 10  # number of time steps to forecast
-    y_pred = np.zeros(h)  # initialize an array to store the predicted values
-
-    # Use the last n_lags values of the endogenous time series and exogenous variables as the input for the first forecast
-    x_forecast = np.concatenate((y[-p:], exog[-p:, :].flatten()))
+    decoder = Model(inputs=autoencoder.input, outputs=autoencoder.get_layer('decoded').output)
 
     return encoded_train, encoded_tv, encoded_test, decoder
-
 
 
 
