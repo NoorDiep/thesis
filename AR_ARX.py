@@ -59,6 +59,8 @@ def getForecast(x, y, n_train, n_tv, n_test, h, diff_lag):
     p_iX = []
     q_iX = []
     y_test = pd.DataFrame(y[n_tv:])
+    error = []
+    errorX = []
 
     for i in range(0, y.shape[1]):
 
@@ -90,9 +92,10 @@ def getForecast(x, y, n_train, n_tv, n_test, h, diff_lag):
                                     dynamic=False)
             y_hatARX = preds_ARX[h-1]
             f_kX.append(y_hatARX)
-
+        error.append(f_k -y_test.iloc[h-1:,i])
+        errorX.append(f_kX -y_test.iloc[h-1:,i])
         acc_AR = forecast_accuracy(f_k, y_test.iloc[h-1:,i], df_indicator=0)
-        acc_ARX = forecast_accuracy(f_k, y_test.iloc[h-1:,i], df_indicator=0)
+        acc_ARX = forecast_accuracy(f_kX, y_test.iloc[h-1:,i], df_indicator=0)
 
         f_i.append(acc_AR)
         f_iX.append(acc_ARX)
@@ -105,7 +108,7 @@ def getForecast(x, y, n_train, n_tv, n_test, h, diff_lag):
     resultsARX['lag p'] = pd.DataFrame(p_iX)
     resultsARX['lag q'] = pd.DataFrame(q_iX)
 
-    return resultsAR, resultsARX
+    return resultsAR, resultsARX, error, errorX
 
 
 ########################################################################################################################
@@ -114,16 +117,20 @@ def getForecast(x, y, n_train, n_tv, n_test, h, diff_lag):
 
 x = np.vstack((X_tv, X_test))
 y = np.vstack((Y_tv, Y_test))
-pdAR1, pdARX1 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=1, diff_lag=lag)
-pdAR5, pdARX5 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=5, diff_lag=lag)
-pdAR10, pdARX10 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=10, diff_lag=lag)
-pdAR30, pdARX30 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=30, diff_lag=lag)
+pdAR1, pdARX1, error1, errorX1 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=1, diff_lag=lag)
+pdAR5, pdARX5, error5, errorX5 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=5, diff_lag=lag)
+pdAR10, pdARX10, error10, errorX10 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=10, diff_lag=lag)
+pdAR20, pdARX20, error20, errorX20 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=20, diff_lag=lag)
 
 
 y_diff = np.vstack((Y_tv_diff, Y_test_diff))
-pdAR1_diff, pdARX1_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=1, diff_lag=lag)
-pdAR5_diff, pdARX5_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=5, diff_lag=lag)
-pdAR10_diff, pdARX10_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=10, diff_lag=lag)
-pdAR30_diff, pdARX30_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=30, diff_lag=lag)
+pdAR1_diff, pdARX1_diff, error1_diff, errorX1_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=1, diff_lag=lag)
+pdAR5_diff, pdARX5_diff, error5_diff, errorX5_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=5, diff_lag=lag)
+pdAR10_diff, pdARX10_diff, error10_diff, errorX10_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=10, diff_lag=lag)
+pdAR20_diff, pdARX20_diff, error20_diff, errorX20_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=20, diff_lag=lag)
 
 t = 1
+
+
+
+t=1
