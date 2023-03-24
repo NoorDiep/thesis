@@ -1,5 +1,4 @@
 import itertools
-
 from Drivers import get_data, forecast_accuracy, optimal_lag, getDataTablesFigures
 import numpy as np
 import pandas as pd
@@ -52,7 +51,7 @@ def forecast_acc(forecast, actual):
 # RUN CODE
 ########################################################################################################################
 
-def forecastNNARX(x_train, x_tv, x_test, y_train, y_tv, y_test, y_swap, n_train, n_tv, n_test, hidden_nodes, h):
+def forecastNNARX(x_train, x_tv, x_test, y_train, y_tv, y_test, y_swap, n_train, n_tv, n_test, units, h):
     results = []
 
 
@@ -69,22 +68,21 @@ def forecastNNARX(x_train, x_tv, x_test, y_train, y_tv, y_test, y_swap, n_train,
     # model.add(Dense(int(output_nodes)))
     # model.compile(loss='mse', optimizer='adam', metrics=['accuracy'])
     model = Sequential()
-    model.add(LSTM(hidden_nodes, input_shape=(df_x.shape[1], df_x.shape[2])))
+    model.add(LSTM(units, input_shape=(df_x.shape[1], df_x.shape[2])))
     model.add(Dense(1))
     model.compile(loss='mae', optimizer='adam')
 
+    # epochs_list = [25, 50, 100, 150, 200, 250]
+    # batch_size_list = [4, 8, 16, 24, 32, 40, 48, 56]
+    # params = {}
+    # for epochs, batch_size in itertools.product(epochs_list, batch_size_list):
+    #     fitted = model.fit(df_x[:n_train], y_train, epochs=epochs, batch_size=batch_size, shuffle=False,
+    #                              validation_data=(df_x[n_train:n_tv], y_tv[n_train:]))
+    #     fitted_loss = fitted.history['val_loss'][-1]
+    #     params[(epochs, batch_size)] = fitted_loss
     #
-    epochs_list = [50, 100, 150, 200, 250]
-    batch_size_list = [8, 16, 24, 32, 40, 48, 56]
-    params = {}
-    for epochs, batch_size in itertools.product(epochs_list, batch_size_list):
-        fitted = model.fit(df_x[:n_train], y_train, epochs=epochs, batch_size=batch_size, shuffle=False,
-                                 validation_data=(df_x[n_train:n_tv], y_tv[n_train:]))
-        fitted_loss = fitted.history['val_loss'][-1]
-        params[(epochs, batch_size)] = fitted_loss
-
-    opt_params = min(params, key=params.get)
-    # opt_params = [100,32]
+    # opt_params = min(params, key=params.get)
+    opt_params = [100,32]
     model.fit(df_x[:n_tv], y_tv, epochs=opt_params[0], batch_size=opt_params[1], shuffle=False)
 
     print('Opt params:', opt_params)
@@ -101,8 +99,8 @@ def forecastNNARX(x_train, x_tv, x_test, y_train, y_tv, y_test, y_swap, n_train,
             test = y[n_tv+k:n_tv+k + h,i]
             test = pd.DataFrame(test)
 
-            acc_AR = forecast_accuracy(preds[0], test[0], df_indicator=0)
-            f_k.append(acc_AR)
+
+            f_k.append(y_pred)
         f_i = pd.DataFrame(np.concatenate(f_k), columns=['MEA', 'MSE', 'RMSE'])
         means = np.mean(f_i)
         results.append(means)
@@ -110,9 +108,61 @@ def forecastNNARX(x_train, x_tv, x_test, y_train, y_tv, y_test, y_swap, n_train,
     return results1, opt_params
 
 y_swap = np.vstack((Y_tv_diff, Y_test_diff))
-results10_n3, param10_n3 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
-                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), hidden_nodes=3,  h=10)
-results10_n2, param10_n2 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
-                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), hidden_nodes=2,  h=10)
-results10_n4, param10_n4 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
-                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), hidden_nodes=4,  h=10)
+results10_n3, opt_params10_3 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), units=3,  h=10)
+results10_n20, opt_params10_20 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), units=20,  h=10)
+results10_n50, opt_params10_50 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), units=50,  h=10)
+
+results1_n3, opt_params1_3 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), units=3,  h=1)
+results1_n20, opt_params1_20 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), units=20,  h=1)
+results1_n50, opt_params1_50 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), units=50,  h=1)
+
+results5_n3, opt_params5_3 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), units=3,  h=5)
+results5_n20, opt_params5_20 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), units=20,  h=5)
+results5_n50, opt_params5_50 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), units=50,  h=5)
+
+results20_n3, opt_params20_3 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), units=3,  h=20)
+results20_n20, opt_params20_20 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), units=20,  h=20)
+results20_n50, opt_params20_50 = forecastNNARX(X_train_diff, X_tv_diff, X_test_diff, Y_train_diff, Y_tv_diff, Y_test_diff, y_swap,
+                        n_train=len(Y_train_diff), n_tv=len(Y_tv_diff), n_test=len(Y_test_diff), units=50,  h=20)
+
+
+y_swap = np.vstack((Y_tv, Y_test))
+results10L_n3, opt_params10L_3 = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, y_swap,
+                        n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), units=3,  h=10)
+results10L_n20, opt_params10L_20 = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv_diff, Y_test, y_swap,
+                        n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), units=20,  h=10)
+results10L_n50, opt_params10L_50 = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, y_swap,
+                        n_train=len(Y_train), n_tv=len(Y_tv),test=len(Y_test), units=50,  h=10)
+
+results1L_n3, opt_params1L_3 = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, y_swap,
+                        n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), units=3,  h=1)
+results1L_n20, opt_params1L_20 = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, y_swap,
+                        n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), units=20,  h=1)
+results1L_n50, opt_params1L_50 = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, y_swap,
+                        n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), units=50,  h=1)
+
+results5L_n3, opt_params5L_3 = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, y_swap,
+                        n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), units=3,  h=5)
+results5L_n20, opt_params5L_20 = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, y_swap,
+                        n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), units=20,  h=5)
+results5L_n50, opt_params5L_50 = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, y_swap,
+                        n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), units=50,  h=5)
+
+results20L_n3, opt_params20L_3 = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, y_swap,
+                        n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), units=3,  h=20)
+results20L_n20, opt_params20L_20 = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, y_swap,
+                        n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), units=20,  h=20)
+results20L_n50, opt_params20L_50 = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, y_swap,
+                        n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), units=50,  h=20)
+t=1
