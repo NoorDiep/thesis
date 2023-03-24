@@ -1,3 +1,5 @@
+from statsmodels.tsa.ar_model import AutoReg
+
 from Drivers import get_data, forecast_accuracy, optimal_lag, getDataTablesFigures
 from statsmodels.tsa.arima.model import ARIMA
 import numpy as np
@@ -7,7 +9,8 @@ import pandas as pd
 # LOAD DATA
 ########################################################################################################################
 # Import data into 60% training, 20% validation and 20% test sets
-data, df, df_diff, date_train, date_test, date_train_diff, date_test_diff, depo, swap_dates, spread, spread_diff = get_data(lag=5)
+lag=5
+data, df, df_diff, date_train, date_test, date_train_diff, date_test_diff, depo, swap_dates, spread, spread_diff = get_data(lag=lag)
 
 X_train = df[0]
 X_val = df[1]
@@ -46,83 +49,63 @@ def forecast_acc(forecast, actual):
 ###### Results with differences ######
 
 
-def getForecast(x, y, n_train, n_tv, n_test, h):
+def getForecast(x, y, n_train, n_tv, n_test, h, diff_lag):
 
-
-    w = n_train
-
+    # Intitialize variables
+    w = n_tv
     f_i = []
     f_iX = []
-    p_ARi = []
-    p_ARXi = []
-    q_ARXi = []
-    resultsAR = []
-    resultsARX = []
-
-
+    p_i = []
+    p_iX = []
+    q_iX = []
+    y_test = pd.DataFrame(y[n_tv:])
 
     for i in range(0, y.shape[1]):
 
-        p_AR1 = optimal_lag(x_train=0, x_tv=0, y_train=y[:n_train,i], y_tv=y[:n_tv,i], maxlags_p=30, maxlags_q=15, indicator=0)
-        p_ARX1, q_ARX1 = optimal_lag(x_train=x[:n_train], x_tv=x[:n_tv], y_train=y[:n_train,i], y_tv=y[:n_tv,i], maxlags_p=30, maxlags_q=15, indicator=1)
-        p_ARi.append(p_AR1)
-        p_ARXi.append(p_ARX1)
-        q_ARXi.append(q_ARX1)
+        p_AR1 = optimal_lag(x_train=0, x_tv=0, y_train=y[:n_train,i], y_tv=y[:n_tv,i], maxlags_p=10, maxlags_q=10, indicator=0)
+        p_ARX1, q_ARX1 = optimal_lag(x_train=x[:n_train], x_tv=x[:n_tv], y_train=y[:n_train,i], y_tv=y[:n_tv,i], maxlags_p=10, maxlags_q=10, indicator=1)
+        p_i.append(p_AR1)
+        p_iX.append(p_ARX1)
+        q_iX.append(q_ARX1)
 
         f_k = []
         f_kX = []
-        #xtrain = pd.DataFrame(X_tv_diff).shift(q_ARX).dropna()
-        AR = ARIMA(y[:n_tv,i], order=(p_AR1, 0, 0)).fit()
-        ARX = ARIMA(y[:n_tv,i], exog=x[:n_tv], order=(p_ARX1, 0, 0)).fit()
 
         # Perform rolling window forecasts
         for k in range(n_test - h + 1):
             print(i)
             print(k)
+
+            # Fit both models
+            AR = AutoReg(endog=y[:k+h+w-1, i], lags=p_AR1).fit()
+            ARX = AutoReg(endog=y[:k+h+w-1, i], exog=x[:k+h+w-1], lags=p_ARX1).fit()
+
             # # Forecast out-of-sample
-            preds_AR = AR.predict(start=len(Y_tv[i])+k, end=len(Y_tv[i])+k + h-1, dynamic=True) # Dynamic equal to False means direct forecasts
-            preds_AR = pd.DataFrame(preds_AR)
-            preds_AR.index = date_test.iloc[k:k+h]
-
-            test = y[len(Y_tv[i])+k:len(Y_tv[i])+k + h]
-            test = pd.DataFrame(test)
-            test.index = date_test.iloc[k:k + h]
-
-            preds_AR = preds_AR.T.reset_index(drop=True).T
-            acc_AR = forecast_accuracy(preds_AR[0], test[0], df_indicator=0)
-            f_k.append(acc_AR)
+            preds_AR = AR.predict(start=w+k, end=w+k+h-1, dynamic=False)
+            y_hatAR = preds_AR[h-1]
+            f_k.append(y_hatAR)
 
             # Forecast out-of-sample
-            preds_ARX = ARX.predict(start=len(Y_tv[i]) + k, end=len(Y_tv[i]) + k + h-1 , exog=x[k-w:k+h-w+q_ARX1+k-1],
-                                    dynamic=True)  # Dynamic equal to False means direct forecasts
-            preds_ARX = pd.DataFrame(preds_ARX)
-            preds_ARX.index = date_test.iloc[k:k + h]
-            preds_ARX = preds_ARX.T.reset_index(drop=True).T
-            test = y[len(Y_tv[i]) + k:len(Y_tv[i]) + k + h]
-            test = pd.DataFrame(test)
-            test.index = date_test.iloc[k:k + h]
+            preds_ARX = ARX.predict(start=w+k, end=w+k+h-1, exog=x[:w+k+h-1], exog_oos=x[w:k+h+w+k],
+                                    dynamic=False)
+            y_hatARX = preds_ARX[h-1]
+            f_kX.append(y_hatARX)
 
-            # Get forecast accuracy
-            acc_ARX = forecast_accuracy(preds_ARX[0], test[0], df_indicator=0)
-            f_kX.append(acc_ARX)
+        acc_AR = forecast_accuracy(f_k, y_test.iloc[h-1:,i], df_indicator=0)
+        acc_ARX = forecast_accuracy(f_k, y_test.iloc[h-1:,i], df_indicator=0)
 
-        f_i = pd.DataFrame(np.concatenate(f_k), columns=['MEA', 'MSE', 'RMSE'])
-        means = np.mean(f_i)
-        means['lag p'] = p_AR1
-        f_iX = pd.DataFrame(np.concatenate(f_kX), columns=['MEA', 'MSE', 'RMSE'])
-        meansX = np.mean(f_iX)
-        meansX['lag p'] = p_ARX1
-        meansX['lag q'] = q_ARX1
-        print(means)
-        print(meansX)
-        resultsAR.append(means)
-        resultsARX.append(meansX)
-        print('optimal p AR:', p_AR1)
-        print('optimal p, q:', p_ARX1, q_ARX1)
+        f_i.append(acc_AR)
+        f_iX.append(acc_ARX)
 
-    resultsAR1 = pd.DataFrame(resultsAR)
-    resultsARX1 = pd.DataFrame(resultsARX)
-    return resultsAR1, resultsARX1
+    t=1
+    resultsAR = pd.DataFrame(np.concatenate(f_i), columns=['MEA', 'MSE'])
+    resultsAR['lag p'] = pd.DataFrame(p_i)
+
+    resultsARX = pd.DataFrame(np.concatenate(f_iX), columns=['MEA', 'MSE'])
+    resultsARX['lag p'] = pd.DataFrame(p_iX)
+    resultsARX['lag q'] = pd.DataFrame(q_iX)
+
+    return resultsAR, resultsARX
 
 
 ########################################################################################################################
@@ -131,16 +114,16 @@ def getForecast(x, y, n_train, n_tv, n_test, h):
 
 x = np.vstack((X_tv, X_test))
 y = np.vstack((Y_tv, Y_test))
-#pdAR1, pdARX1 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=1)
-#pdAR5, pdARX5 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=5)
-pdAR10, pdARX10 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=10)
-#pdAR30, pdARX30 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=30)
+pdAR1, pdARX1 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=1, diff_lag=lag)
+pdAR5, pdARX5 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=5, diff_lag=lag)
+pdAR10, pdARX10 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=10, diff_lag=lag)
+pdAR30, pdARX30 = getForecast(x, y, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=30, diff_lag=lag)
 
 
 y_diff = np.vstack((Y_tv_diff, Y_test_diff))
-#pdAR1_diff, pdARX1_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=1)
-#pdAR5_diff, pdARX5_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=5)
-pdAR10_diff, pdARX10_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=10)
-#pdAR30_diff, pdARX30_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=30)
+pdAR1_diff, pdARX1_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=1, diff_lag=lag)
+pdAR5_diff, pdARX5_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=5, diff_lag=lag)
+pdAR10_diff, pdARX10_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=10, diff_lag=lag)
+pdAR30_diff, pdARX30_diff = getForecast(x, y_diff, n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), h=30, diff_lag=lag)
 
 t = 1
