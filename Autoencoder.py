@@ -147,85 +147,87 @@ def getForecastAE(decoder, x, y, y_swap, n_train, n_tv, n_test, h):
 
     preds_AR = decoder.predict(pd.DataFrame(f_i).T)
     preds_ARX = decoder.predict(pd.DataFrame(f_iX).T)
-
     acc_AR = forecast_accuracy(pd.DataFrame(preds_AR), pd.DataFrame(y_swap[-n_test + h - 1:]), df_indicator=1)
     acc_ARX = forecast_accuracy(pd.DataFrame(preds_ARX), pd.DataFrame(y_swap[-n_test + h - 1:]), df_indicator=1)
 
-    resultsAR = pd.DataFrame(acc_AR, columns=['MEA', 'MSE'])
+    resultsAR = pd.DataFrame(acc_AR, columns=['MEA', 'RMSE'])
     resultsAR['lag p'] = pd.DataFrame(p_i)
 
-    resultsARX = pd.DataFrame(acc_ARX, columns=['MEA', 'MSE'])
+    resultsARX = pd.DataFrame(acc_ARX, columns=['MEA', 'RMSE'])
     resultsARX['lag p'] = pd.DataFrame(p_iX)
     resultsARX['lag q'] = pd.DataFrame(q_iX)
 
-    return resultsAR, resultsARX
+    error = pd.DataFrame(preds_AR) - pd.DataFrame(y_swap[-n_test + h - 1:])
+    errorX = pd.DataFrame(preds_ARX) - pd.DataFrame(y_swap[-n_test + h - 1:])
+
+    return resultsAR, resultsARX, pd.DataFrame(error), pd.DataFrame(errorX)
 
 
-ae_train, ae_tv, ae_test, decoder, opt_parameters = buildAE(Y_train_diff, Y_tv_diff, Y_test_diff, n=3)
+ae_train, ae_tv, ae_test, decoder, opt_parameters3 = buildAE(Y_train_diff, Y_tv_diff, Y_test_diff, n=3)
 y = np.vstack((pd.DataFrame(ae_tv), pd.DataFrame(ae_test)))
 x = np.vstack((X_tv, X_test))
 y_swap = np.vstack((Y_tv_diff, Y_test_diff))
 
-AE3_AR10, AE3_ARX10 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=10)
-AE3_AR1, AE3_ARX1 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=1)
-AE3_AR5, AE3_ARX5 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=5)
-AE3_AR20, AE3_ARX20 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=20)
+AE3_AR10, AE3_ARX10, error3_10, errorX3_10 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=10)
+AE3_AR1, AE3_ARX1, error3_1, errorX3_1 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=1)
+AE3_AR5, AE3_ARX5, error3_5, errorX3_5 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=5)
+AE3_AR20, AE3_ARX20, error3_20, errorX3_20 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=20)
 t=1
 
-ae_train, ae_tv, ae_test, decoder, opt_parameters = buildAE(Y_train_diff, Y_tv_diff, Y_test_diff, n=2)
+ae_train, ae_tv, ae_test, decoder, opt_parameters2 = buildAE(Y_train_diff, Y_tv_diff, Y_test_diff, n=2)
 y = np.vstack((pd.DataFrame(ae_tv), pd.DataFrame(ae_test)))
 x = np.vstack((X_tv, X_test))
 y_swap = np.vstack((Y_tv_diff, Y_test_diff))
 
-AE2_AR10, AE2_ARX10 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=10)
-AE2_AR1, AE2_ARX1 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=1)
-AE2_AR5, AE2_ARX5 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=5)
-AE2_AR20, AE2_ARX20 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=20)
+AE2_AR10, AE2_ARX10, error2_10, errorX2_10 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=10)
+AE2_AR1, AE2_ARX1, error2_1, errorX2_1 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=1)
+AE2_AR5, AE2_ARX5, error2_5, errorX2_5 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=5)
+AE2_AR20, AE2_ARX20, error2_20, errorX2_20 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=20)
 t=1
 
-ae_train, ae_tv, ae_test, decoder, opt_parameters = buildAE(Y_train_diff, Y_tv_diff, Y_test_diff, n=4)
+ae_train, ae_tv, ae_test, decoder, opt_parameters4 = buildAE(Y_train_diff, Y_tv_diff, Y_test_diff, n=4)
 y = np.vstack((pd.DataFrame(ae_tv), pd.DataFrame(ae_test)))
 x = np.vstack((X_tv, X_test))
 y_swap = np.vstack((Y_tv_diff, Y_test_diff))
 
-AE4_AR10, AE4_ARX10 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=10)
-AE4_AR1, AE4_ARX1 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=1)
-AE4_AR5, AE4_ARX5 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=5)
-AE4_AR20, AE4_ARX20 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=20)
+AE4_AR10, AE4_ARX10, error4_10, errorX4_10 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=10)
+AE4_AR1, AE4_ARX1, error4_1, errorX4_1 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=1)
+AE4_AR5, AE4_ARX5, error4_5, errorX4_5 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=5)
+AE4_AR20, AE4_ARX20, error4_20, errorX4_20 = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=20)
 t=1
 
 
 
 
-ae_train, ae_tv, ae_test, decoder, opt_parameters = buildAE(Y_train, Y_tv, Y_test, n=3)
+ae_train, ae_tv, ae_test, decoder, opt_parameters3l = buildAE(Y_train, Y_tv, Y_test, n=3)
 y = np.vstack((pd.DataFrame(ae_tv), pd.DataFrame(ae_test)))
 x = np.vstack((X_tv, X_test))
 y_swap = np.vstack((Y_tv, Y_test))
 
-AE3_AR10l, AE3_ARX10l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=10)
-AE3_AR1l, AE3_ARX1l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=1)
-AE3_AR5l, AE3_ARX5l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=5)
-AE3_AR20l, AE3_ARX20l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=20)
+AE3_AR10l, AE3_ARX10l, error3_10l, errorX3_10l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=10)
+AE3_AR1l, AE3_ARX1l, error3_1l, errorX3_1l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=1)
+AE3_AR5l, AE3_ARX5l, error3_5l, errorX3_5l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=5)
+AE3_AR20l, AE3_ARX20l, error3_20l, errorX3_20l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=20)
 t=1
 
-ae_train, ae_tv, ae_test, decoder, opt_parameters = buildAE(Y_train, Y_tv, Y_test, n=2)
+ae_train, ae_tv, ae_test, decoder, opt_parameters2l = buildAE(Y_train, Y_tv, Y_test, n=2)
 y = np.vstack((pd.DataFrame(ae_tv), pd.DataFrame(ae_test)))
 x = np.vstack((X_tv, X_test))
 y_swap = np.vstack((Y_tv, Y_test))
 
-AE2_AR10l, AE2_ARX10l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=10)
-AE2_AR1l, AE2_ARX1l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=1)
-AE2_AR5l, AE2_ARX5l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=5)
-AE2_AR20l, AE2_ARX20l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=20)
+AE2_AR10l, AE2_ARX10l, error2_10l, errorX2_10l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=10)
+AE2_AR1l, AE2_ARX1l, error2_1l, errorX2_1l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=1)
+AE2_AR5l, AE2_ARX5l, error2_5l, errorX2_5l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=5)
+AE2_AR20l, AE2_ARX20l, error2_20l, errorX2_20l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=20)
 t=1
 
-ae_train, ae_tv, ae_test, decoder, opt_parameters = buildAE(Y_train, Y_tv, Y_test, n=4)
+ae_train, ae_tv, ae_test, decoder, opt_parameters4l = buildAE(Y_train, Y_tv, Y_test, n=4)
 y = np.vstack((pd.DataFrame(ae_tv), pd.DataFrame(ae_test)))
 x = np.vstack((X_tv, X_test))
 y_swap = np.vstack((Y_tv, Y_test))
 
-AE4_AR10l, AE4_ARX10l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=10)
-AE4_AR1l, AE4_ARX1l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=1)
-AE4_AR5l, AE4_ARX5l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=5)
-AE4_AR20l, AE4_ARX20l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=20)
+AE4_AR10l, AE4_ARX10l, error4_10l, errorX4_10l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=10)
+AE4_AR1l, AE4_ARX1l, error4_1l, errorX4_1l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=1)
+AE4_AR5l, AE4_ARX5l, error4_5l, errorX4_5l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=5)
+AE4_AR20l, AE4_ARX20l, error4_20l, errorX4_20l = getForecastAE(decoder, x, y, y_swap, n_train=len(ae_train), n_tv=len(ae_tv), n_test=len(ae_test), h=20)
 t=1
