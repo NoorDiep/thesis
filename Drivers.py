@@ -68,7 +68,7 @@ def get_data(lag):
     df_drivers = df_drivers.drop('GB_P', axis=1)
     df_drivers = df_drivers.drop('GB_BA', axis=1)
     df_drivers = df_drivers.drop('Swap spread', axis=1)
-    df_drivers  = df_drivers.drop('Date', axis=1)
+    df_drivers = df_drivers.drop('Date', axis=1)
 
 
     diff_swap = difference_series(df_swap, lag)
@@ -91,13 +91,19 @@ def get_data(lag):
 
     df_drivers = pd.DataFrame([df_drivers['EcSu'],df_drivers_diff['Sent'],df_drivers['Stress'],df_drivers['PoUn'],df_drivers_diff['News'],df_drivers['Infl']]).T
 
-    # print(sm.OLS(df_swap['10Y'], add_constant(df_drivers)).fit().summary())
-    # print(sm.OLS(df_swap['1Y'], add_constant(df_drivers)).fit().summary())
-    # print(sm.OLS(df_swap['30Y'], add_constant(df_drivers)).fit().summary())
-    #
-    # print(sm.OLS(diff_swap['10Y'], add_constant(df_drivers)).fit().summary())
-    # print(sm.OLS(diff_swap['1Y'], add_constant(df_drivers)).fit().summary())
-    # print(sm.OLS(diff_swap['30Y'], add_constant(df_drivers)).fit().summary())
+    print('10Y levels')
+    print(sm.OLS(df_swap['10Y'], add_constant(df_drivers)).fit().summary())
+    print('1Y levels')
+    print(sm.OLS(df_swap['1Y'], add_constant(df_drivers)).fit().summary())
+    print('30Y levels')
+    print(sm.OLS(df_swap['30Y'], add_constant(df_drivers)).fit().summary())
+
+    print('10Y diff')
+    print(sm.OLS(diff_swap['10Y'], add_constant(df_drivers)).fit().summary())
+    print('1Y diff')
+    print(sm.OLS(diff_swap['1Y'], add_constant(df_drivers)).fit().summary())
+    print('30Y diff')
+    print(sm.OLS(diff_swap['30Y'], add_constant(df_drivers)).fit().summary())
     #print(sm.OLS(diff_swap['10Y'], add_constant(df_drivers_diff)).fit().summary())
 
     # Selected set for descriptive statistics
@@ -526,29 +532,7 @@ def buildAE(y_train, y_tv, y_test):
 
     return encoded_train, encoded_tv, encoded_test, decoder
 
-def buildNNARX(x_train, x_tv, x_test, y_train, y_tv, y_test, p):
-    # https://www.kaggle.com/code/saivarunk/dimensionality-reduction-using-keras-auto-encoder
 
-    ncol = y_train.shape[1]
-    n_train = y_train.shape[0]
-    n_exog = x_train.shape[1]
-    encoding_dim = 3
 
-    model = Sequential()
-    model.add(Dense(50, activation='relu', input_shape=(p * (1 + n_exog),)))
-    model.add(Dense(1))
 
-    # Compile the model
-    model.compile(loss='mse', optimizer='adam')
 
-    # Train the model
-    model.fit(x_train, y_train, epochs=100, batch_size=32, validation_data=(x_tv[n_train:], y_tv[n_train:]))
-
-    # Use the trained model to predict the endogenous time series for future time steps
-    h = 10  # number of time steps to forecast
-    y_pred = np.zeros(h)  # initialize an array to store the predicted values
-
-    # Use the last n_lags values of the endogenous time series and exogenous variables as the input for the first forecast
-    x_forecast = np.concatenate((y[-p:], exog[-p:, :].flatten()))
-
-    return encoded_train, encoded_tv, encoded_test, decoder
