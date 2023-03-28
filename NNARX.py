@@ -70,7 +70,7 @@ def forecastNNARX(x_train, x_tv, x_test, y_train, y_tv, y_test, y_swap, n_train,
     model.add(Dense(1))
     model.compile(loss='mae', optimizer='adam')
 
-    epochs_list = [10, 15, 20, 25, 30, 35]
+    epochs_list = [5, 10, 15, 20, 25, 30, 35]
     batch_size_list = [2, 4, 6, 8]
     params = {}
     for epochs, batch_size in itertools.product(epochs_list, batch_size_list):
@@ -80,7 +80,7 @@ def forecastNNARX(x_train, x_tv, x_test, y_train, y_tv, y_test, y_swap, n_train,
         params[(epochs, batch_size)] = fitted_loss
 
     opt_params = min(params, key=params.get)
-    #opt_params = [5,32]
+    # opt_params = [1,1000]
 
 
     print('Opt params:', opt_params)
@@ -100,9 +100,10 @@ def forecastNNARX(x_train, x_tv, x_test, y_train, y_tv, y_test, y_swap, n_train,
         f_i.append(f_k)
     f_i = pd.DataFrame(f_i).T
     f_i.columns = y_test.columns
-    y_test = y_test.iloc[h-1:,].reset_index(drop=True, inplace=True)
-    error = f_i - y_test
-    results = forecast_accuracy(f_i, y_test, df_indicator=1)
+    test = y_test.iloc[h-1:,]
+    test = test.reset_index(drop=True)
+    error = f_i - test
+    results = forecast_accuracy(f_i, test, df_indicator=1)
     return results, opt_params, error
 
 y_swap = np.vstack((Y_tv_diff, Y_test_diff))
