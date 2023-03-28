@@ -8,8 +8,8 @@ import statsmodels.api as sm
 from statsmodels.tools import add_constant
 
 from AR_ARX import getForecast
-from AE_AR_X import buildAE, getForecastAE
-from PCA_AR_X import getPC, getForecastPCA
+from Autoencoder import buildAE, getForecastAE
+from PCA import getPC, getForecastPCA
 from NNARX import forecastNNARX
 
 ########################################################################################################################
