@@ -1,21 +1,107 @@
-from statsmodels.tsa.ar_model import AutoReg
-
-from Drivers import get_data, forecast_accuracy, optimal_lag, getDataTablesFigures
-from statsmodels.tsa.arima.model import ARIMA
-import numpy as np
+from sklearn.model_selection import train_test_split
 import pandas as pd
-import statsmodels.api as sm
-from statsmodels.tools import add_constant
+import numpy as np
+from matplotlib import pyplot
+from sklearn.model_selection import train_test_split, GridSearchCV
 
+from statsmodels.tools import add_constant
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+import matplotlib.pyplot as plt
+import matplotlib.dates as dates
+import matplotlib.ticker as ticker
+
+from Drivers import read_file, difference_series, get_ds, getCSSED
 from AR_ARX import getForecast
-from Autoencoder import buildAE, getForecastAE
+from AE_AR_X import buildAE, getForecastAE
 from PCA_AR_X import getPC, getForecastPCA
 from NNARX import forecastNNARX
+import statsmodels.api as sm
 
-########################################################################################################################
-# LOAD DATA
-########################################################################################################################
-# Import data into 60% training, 20% validation and 20% test sets
+
+def get_data(lag):
+
+    # Load all data
+    df_swap, dates = read_file(file='SwapDriverData1.xlsx', sheet='Swap')
+    df_drivers = pd.read_excel('Driver.xlsx')
+    depo = read_file(file='SwapDriverData1.xlsx', sheet='DEPO')
+    spread = pd.read_excel('Spread.xlsx')
+    spread = spread.drop('Date', axis=1)
+
+    spread = spread.dropna()
+    # df_swap = df_swap[1015:]
+    # df_drivers = df_drivers[1015:]
+    # dates = dates[1015:]
+
+    df_drivers = df_drivers.drop('Stress', axis=1)
+    df_drivers = df_drivers.drop('EcSu', axis=1)
+    #df_drivers = df_drivers.drop('Sent', axis=1)
+    df_drivers = df_drivers.drop('PoUn', axis=1)
+    df_drivers = df_drivers.drop('News', axis=1)
+    df_drivers = df_drivers.drop('Vol', axis=1)
+    df_drivers = df_drivers.drop('Infl', axis=1)
+    df_drivers = df_drivers.drop('Depo', axis=1)
+    df_drivers = df_drivers.drop('GB_P', axis=1)
+    df_drivers = df_drivers.drop('GB_BA', axis=1)
+    df_drivers = df_drivers.drop('Swap spread', axis=1)
+    df_drivers  = df_drivers.drop('Date', axis=1)
+
+
+    diff_swap = difference_series(df_swap, lag)
+    df_drivers_diff = difference_series(df_drivers, lag)
+    df_spread_diff = difference_series(spread, lag)
+    #df_drivers_diff = df_drivers.iloc[lag:]  # Cut off first n observations
+
+    # Get descriptive statistics, corelation tables, adf test results and figures for Data Section
+    #getDataTablesFigures()
+
+    # Create train, validation and test set
+    df_swap = df_swap.iloc[lag:]
+    df_drivers = df_drivers.iloc[lag:]
+    df_drivers = df_drivers.reset_index(drop=True)
+    df_swap_dates = df_swap
+    df_swap = df_swap.reset_index(drop=True)
+    spread = spread.reset_index(drop=True)
+
+    # Construct final df
+
+    df_drivers = pd.DataFrame([df_drivers['EcSu'],df_drivers_diff['Sent'],df_drivers['Stress'],df_drivers['PoUn'],df_drivers_diff['News'],df_drivers['Infl']]).T
+
+    # print(sm.OLS(df_swap['10Y'], add_constant(df_drivers)).fit().summary())
+    # print(sm.OLS(df_swap['1Y'], add_constant(df_drivers)).fit().summary())
+    # print(sm.OLS(df_swap['30Y'], add_constant(df_drivers)).fit().summary())
+    #
+    # print(sm.OLS(diff_swap['10Y'], add_constant(df_drivers)).fit().summary())
+    # print(sm.OLS(diff_swap['1Y'], add_constant(df_drivers)).fit().summary())
+    # print(sm.OLS(diff_swap['30Y'], add_constant(df_drivers)).fit().summary())
+    #print(sm.OLS(diff_swap['10Y'], add_constant(df_drivers_diff)).fit().summary())
+
+    # Selected set for descriptive statistics
+    # df_crisis = diff_swap[:1433];
+    # df_post_crisis = diff_swap[1433:]
+    # get_ds(df_crisis)
+    # get_ds(df_post_crisis)
+
+    x_train, x_test, y_train, y_test = train_test_split(df_drivers, df_swap, test_size=0.2, shuffle=False)
+    x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.25, shuffle=False)
+
+    x_train_diff, x_test_diff, y_train_diff, y_test_diff = train_test_split(df_drivers_diff, diff_swap, test_size=0.2, shuffle=False)
+    x_train_diff, x_val_diff, y_train_diff, y_val_diff = train_test_split(x_train_diff, y_train_diff, test_size=0.25, shuffle=False)
+
+
+
+    data_full = [df_swap, df_drivers, diff_swap, df_drivers_diff]
+    data = [x_train, x_val, x_test, y_train, y_val, y_test]
+    data_diff = [x_train_diff, x_val_diff, x_test_diff, y_train_diff, y_val_diff, y_test_diff]
+    date_train = dates[:x_train.shape[0]]
+    date_val = dates[x_train.shape[0]:x_val.index[-1]+1]
+    date_test = dates[x_val.index[-1]+1:]
+    date_train_diff = dates[lag:y_train_diff.shape[0]]
+    date_test_diff = dates[y_train_diff.shape[0]:len(dates)-lag]
+
+    return data_full, data, data_diff, date_train, date_test, date_train_diff, date_test_diff, depo, df_swap_dates, spread, df_spread_diff
+
+
 lag=5
 data, df, df_diff, date_train, date_test, date_train_diff, date_test_diff, depo, swap_dates, spread, spread_diff = get_data(lag=lag)
 
@@ -43,7 +129,7 @@ X_tv_diff = np.vstack((X_train_diff, X_val_diff))
 X_diff = np.vstack((X_tv_diff, X_test_diff))
 
 # Return tables and figures for Data section
-getDataTablesFigures(data[0], data[1], pd.DataFrame(Y_diff), pd.DataFrame(X_diff), depo, swap_dates)
+#getDataTablesFigures(data[0], data[1], pd.DataFrame(Y_diff), pd.DataFrame(X_diff), depo, swap_dates)
 
 x = np.vstack((X_tv, X_test))
 y = np.vstack((Y_tv, Y_test))
@@ -306,3 +392,9 @@ results20L_n3, opt_params20L_3, error20_3l = forecastNNARX(X_train, X_tv, X_test
 # results20L_n50, opt_params20L_50, error20_50l = forecastNNARX(X_train, X_tv, X_test, Y_train, Y_tv, Y_test, y_swap,
 #                         n_train=len(Y_train), n_tv=len(Y_tv), n_test=len(Y_test), units=50,  h=20)
 t=1
+
+
+
+
+########## CSSED plots ##########
+CSSED_AR5 = getCSSED(error5, error5_diff)
