@@ -68,7 +68,7 @@ def get_data(lag):
     df_drivers = df_drivers.drop('GB_P', axis=1)
     df_drivers = df_drivers.drop('GB_BA', axis=1)
     df_drivers = df_drivers.drop('Swap spread', axis=1)
-    df_drivers = df_drivers.drop('Date', axis=1)
+    df_drivers  = df_drivers.drop('Date', axis=1)
 
 
     diff_swap = difference_series(df_swap, lag)
@@ -91,19 +91,13 @@ def get_data(lag):
 
     df_drivers = pd.DataFrame([df_drivers['EcSu'],df_drivers_diff['Sent'],df_drivers['Stress'],df_drivers['PoUn'],df_drivers_diff['News'],df_drivers['Infl']]).T
 
-    print('10Y levels')
-    print(sm.OLS(df_swap['10Y'], add_constant(df_drivers)).fit().summary())
-    print('1Y levels')
-    print(sm.OLS(df_swap['1Y'], add_constant(df_drivers)).fit().summary())
-    print('30Y levels')
-    print(sm.OLS(df_swap['30Y'], add_constant(df_drivers)).fit().summary())
-
-    print('10Y diff')
-    print(sm.OLS(diff_swap['10Y'], add_constant(df_drivers)).fit().summary())
-    print('1Y diff')
-    print(sm.OLS(diff_swap['1Y'], add_constant(df_drivers)).fit().summary())
-    print('30Y diff')
-    print(sm.OLS(diff_swap['30Y'], add_constant(df_drivers)).fit().summary())
+    # print(sm.OLS(df_swap['10Y'], add_constant(df_drivers)).fit().summary())
+    # print(sm.OLS(df_swap['1Y'], add_constant(df_drivers)).fit().summary())
+    # print(sm.OLS(df_swap['30Y'], add_constant(df_drivers)).fit().summary())
+    #
+    # print(sm.OLS(diff_swap['10Y'], add_constant(df_drivers)).fit().summary())
+    # print(sm.OLS(diff_swap['1Y'], add_constant(df_drivers)).fit().summary())
+    # print(sm.OLS(diff_swap['30Y'], add_constant(df_drivers)).fit().summary())
     #print(sm.OLS(diff_swap['10Y'], add_constant(df_drivers_diff)).fit().summary())
 
     # Selected set for descriptive statistics
@@ -449,7 +443,7 @@ def forecast_accuracy(forecast, actual, df_indicator):
 
         return pd.DataFrame([[mae, np.sqrt(mse)]], columns=['mae','rmse'])
 
-def getCSSDE(errorB, errorM):
+def getCSSED(errorB, errorM, data):
     cssde = []
 
     for idx in range(errorB.shape[0]):
@@ -477,60 +471,9 @@ def plot_components(x, data):
     axis.add_artist(legend1)
     plt.show()
 
-def buildAE(y_train, y_tv, y_test):
-    # https://www.kaggle.com/code/saivarunk/dimensionality-reduction-using-keras-auto-encoder
-
-    ncol = y_train.shape[1]
-
-    encoding_dim = 3
-    input_dim = Input(shape=(ncol,))
-
-    # Encoder Layers
-    encoded = Dense(3, activation='tanh')(input_dim)
-
-    # Decoder Layers
-    decoded = Dense(ncol, activation='linear')(encoded)
-
-    # Combine Encoder and Deocder layers
-    autoencoder = Model(inputs=input_dim, outputs=decoded)
-
-
-    encoder = Model(inputs=input_dim, outputs=encoded)
-    encoded_input = Input(shape=(encoding_dim,))
-    decoder_layer = autoencoder.layers[-1]
-    decoder = Model(inputs=encoded_input, outputs=decoder_layer(encoded_input))
-
-    autoencoder.compile(optimizer='Nadam', loss='mean_squared_error')
-
-    # Define parameter grid for grid search
-    #param_grid = {'epochs': [25, 50, 75, 100], 'batch_size': [8, 16, 24, 32, 40]}
-
-    autoencoder.fit(y_train, y_train,
-                    epochs=150,
-                    batch_size=50,
-                    shuffle=True,
-                    validation_data=(y_tv[len(y_train):], y_tv[len(y_train):]))
-
-    # Print best parameters
-    #print("Best parameters: ", grid_search.best_params_)
-
-
-    #autoencoder.fit(y_train, y_train, epochs=20, batch_size=32, shuffle=False)
-
-
-    encoded_input = Input(shape=(encoding_dim,))
-    encoded_train = pd.DataFrame(encoder.predict(y_train))
-    encoded_train = encoded_train.add_prefix('feature_')
-
-    encoded_tv = pd.DataFrame(encoder.predict(y_tv))
-    encoded_tv = encoded_tv.add_prefix('feature_')
-
-    encoded_test = pd.DataFrame(encoder.predict(y_test))
-    encoded_test = encoded_test.add_prefix('feature_')
 
 
 
-    return encoded_train, encoded_tv, encoded_test, decoder
 
 
 
