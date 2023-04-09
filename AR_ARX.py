@@ -83,13 +83,13 @@ def getForecast(x, y, n_train, n_tv, n_test, h, diff_lag):
             ARX = AutoReg(endog=y[:k+h+w-1, i], exog=x[:k+h+w-1], lags=p_ARX1).fit()
 
             # # Forecast out-of-sample
-            preds_AR = AR.predict(start=w+k, end=w+k+h-1, dynamic=False)
+            preds_AR = AR.predict(start=w+k, end=w+k+h-1, dynamic=True)
             y_hatAR = preds_AR[h-1]
             f_k.append(y_hatAR)
 
             # Forecast out-of-sample
             preds_ARX = ARX.predict(start=w+k, end=w+k+h-1, exog=x[:w+k+h-1], exog_oos=x[w:k+h+w+k],
-                                    dynamic=False)
+                                    dynamic=True)
             y_hatARX = preds_ARX[h-1]
             f_kX.append(y_hatARX)
         error.append(f_k -y_test.iloc[h-1:,i])
